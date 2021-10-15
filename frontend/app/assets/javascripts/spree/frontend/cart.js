@@ -56,8 +56,10 @@ Spree.ready(function ($) {
       var input = $("input[data-id='" + itemId + "']")
       var inputValue = parseInt($(input).val(), 10)
 
+      var delta = parseInt($(this).attr('data-delta'))
+
       if (inputValue > 1) {
-        $(input).val(inputValue - 1)
+        $(input).val(inputValue - delta)
         clearInvalidCouponField()
         formUpdateCart.submit()
       }
@@ -67,7 +69,9 @@ Spree.ready(function ($) {
       var input = $("input[data-id='" + itemId + "']")
       var inputValue = parseInt($(input).val(), 10)
 
-      $(input).val(inputValue + 1)
+      var delta = parseInt($(this).attr('data-delta'))
+
+      $(input).val(inputValue + delta)
       clearInvalidCouponField()
       formUpdateCart.submit()
     })

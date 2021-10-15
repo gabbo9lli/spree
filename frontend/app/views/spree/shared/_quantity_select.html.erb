@@ -1,6 +1,32 @@
 <%# TODO: Use in cart %>
+<% if @product.has_variants? %>
+  <% weight = @product.master.weight.to_i %>
+<% else %>
+  <% weight = @product.weight.to_i %>
+<% end %>
+
+<%# <%   unless weigth.present? && (weigth.value.to_i > 0) then weigth = 1 end %>
 <div class="d-inline-flex quantity-select">
-  <%= button_tag '-', type: 'button', class: "border-right-0 flex-grow-0 flex-shrink-0 py-0 px-3 quantity-select-decrease" %>
-  <%= number_field_tag input_name, 1, min: 1, max: maximum_quantity, class: "p-0 flex-grow-1 flex-shrink-1 text-center form-control border-left-0 border-right-0 quantity-select-value", 'aria-label': Spree.t('pdp.quantity') %>
-  <%= button_tag '+', type: 'button', class: "border-left-0  flex-grow-0 flex-shrink-0 py-0 px-3 quantity-select-increase" %>
+  <%= button_tag '-', type: 'button', class: "border-right-0 flex-grow-0 flex-shrink-0 py-0 px-3 quantity-select-decrease", data: { delta: weight } %>
+  <%= number_field_tag input_name, weight, min: weight, max: maximum_quantity, class: "p-0 flex-grow-1 flex-shrink-1 text-center form-control border-left-0 border-right-0 quantity-select-value", 'aria-label': Spree.t('pdp.quantity') %>
+  <%= button_tag '+', type: 'button', class: "border-left-0  flex-grow-0 flex-shrink-0 py-0 px-3 quantity-select-increase", data: { delta: weight } %>
 </div>
+
+
+
+<%#
+quantity-select-increase
+shopping-cart-item-quantity-increase-btn
+@product.product_properties.includes(:property).where(spree_properties: { name: params[:id] }).first
+var input = $("input[data-id='" + itemId + "']")
+property = @product.properties.where("presentation like (?)", "%#{Spree.t(:weight).downcase}%").last
+              measure_property = Spree::ProductProperty.where(property_id: property.id, product_id: @product.id) if property.present?
+                default = 1
+                minimum = 1
+                step = 1
+                if measure_property.present? && (measure_property.last.value.to_i > 0)
+                  default = measure_property.last.value.to_i 
+                  minimum = measure_property.last.value.to_i
+                  step = minimum
+                end
+ %>

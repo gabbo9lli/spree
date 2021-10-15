@@ -14,8 +14,10 @@ Spree.ready(function($) {
         : parseInt($quantitySelectValue.attr('min'), 10)
     var value = parseInt($quantitySelectValue.val(), 10)
 
+    var delta = parseInt($(this).attr('data-delta'))
+
     if (typeof min === 'undefined' || value > min) {
-      $quantitySelectValue.val(value - 1)
+      $quantitySelectValue.val(value - delta)
     }
   }
   var onQuantityIncreaseClick = function(event) {
@@ -27,8 +29,10 @@ Spree.ready(function($) {
         : parseInt($quantitySelectValue.attr('max'), 10)
     var value = parseInt($quantitySelectValue.val(), 10)
 
+    var delta = parseInt($(this).attr('data-delta'))
+
     if (typeof max === 'undefined' || value < max) {
-      $quantitySelectValue.val(value + 1)
+      $quantitySelectValue.val(value + delta)
     }
   }
 
