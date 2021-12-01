@@ -80,9 +80,11 @@ gem 'spree_frontend', path: '../frontend'
 gem 'spree_backend', path: '../backend'
 gem 'spree_emails', path: '../emails'
 gem 'spree_sample', path: '../sample'
+gem 'spree_line_order_comments', path: '../spree_line_order_comments'
 $SPREE_AUTH_DEVISE_GEM
 $SPREE_GATEWAY_GEM
 gem 'spree_i18n', github: 'spree-contrib/spree_i18n', branch: 'main'
+#gem 'spree_comments', github: 'spree-contrib/spree_comments'
 
 group :test, :development do
     gem 'bullet'
@@ -121,7 +123,7 @@ cat <<RUBY >> config/initializers/bullet.rb
 if Rails.env.development? && defined?(Bullet)
 Bullet.enable = true
 Bullet.rails_logger = true
-Bullet.stacktrace_includes = [ 'spree_core', 'spree_frontend', 'spree_api', 'spree_backend', 'spree_emails' ]
+Bullet.stacktrace_includes = [ 'spree_core', 'spree_frontend', 'spree_api', 'spree_backend', 'spree_emails', 'spree_line_order_comments' ]
 end
 RUBY
 
@@ -136,6 +138,7 @@ bundle exec rails g spree:emails:install
 fi
 bundle exec rails g spree:auth:install
 bundle exec rails g spree_gateway:install
+bundle exec rails g spree_line_order_comments:install
 
 set +x
 
