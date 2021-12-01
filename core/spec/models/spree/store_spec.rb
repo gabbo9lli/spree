@@ -181,6 +181,23 @@ describe Spree::Store, type: :model do
         end
       end
     end
+
+    describe 'code uniqueness' do
+      context 'selected code was already used in a deleted store' do
+        let(:store_code) { 'store_code' }
+
+        let!(:default_store) { create(:store) }
+        let!(:deleted_store) { create(:store, code: store_code).destroy! }
+
+        it 'does not cause error related to unique constrains in DB' do
+          expect { create(:store, code: store_code) }.not_to raise_error(ActiveRecord::RecordNotUnique)
+        end
+
+        it 'shows accurate validation error' do
+          expect { create(:store, code: store_code) }.to raise_error(ActiveRecord::RecordInvalid, 'Validation failed: Code has already been taken')
+        end
+      end
+    end
   end
 
   describe '.by_url' do
@@ -249,9 +266,11 @@ describe Spree::Store, type: :model do
 
     context 'when a default store is not present' do
       it 'builds a new default store' do
-        expect(Spree::Store.default.class).to eq(Spree::Store)
-        expect(Spree::Store.default.persisted?).to eq(false)
-        expect(Spree::Store.default.default).to be(true)
+        described_class.delete_all
+        Rails.cache.clear
+        expect(described_class.default.class).to eq(described_class)
+        expect(described_class.default.persisted?).to eq(false)
+        expect(described_class.default.default).to be(true)
       end
     end
   end
@@ -314,7 +333,7 @@ describe Spree::Store, type: :model do
     let!(:state3)   { create(:state, country: country3) }
 
     let(:default_zone) do
-      create(:zone, kind: 'country').tap do |zone|
+      Spree::Zone.first || create(:zone, kind: 'country').tap do |zone|
         zone.members.create(zoneable: country3)
       end
     end
@@ -340,23 +359,11 @@ describe Spree::Store, type: :model do
     context do
       include_context 'with checkout zone not set'
 
-      context do
-        include_context 'with default checkout zone set'
+      it 'returns list of all countries' do
+        checkout_available_countries_ids = subject.countries_available_for_checkout.ids
+        all_countries_ids                = Spree::Country.all.ids
 
-        it 'returns country list for default checkout zone' do
-          expect(subject.countries_available_for_checkout).to eq [country3]
-        end
-      end
-
-      context do
-        include_context 'with default checkout zone not set'
-
-        it 'returns list of all countries' do
-          checkout_available_countries_ids = subject.countries_available_for_checkout.pluck(:id)
-          all_countries_ids                = Spree::Country.all.pluck(:id)
-
-          expect(checkout_available_countries_ids).to eq(all_countries_ids)
-        end
+        expect(checkout_available_countries_ids).to eq(all_countries_ids)
       end
     end
   end
@@ -436,11 +443,9 @@ describe Spree::Store, type: :model do
   describe '#ensure_default_country' do
     subject { build(:store) }
 
-    let!(:default_country) { create(:country) }
+    let!(:default_country) { Spree::Country.first || create(:country) }
     let!(:other_country) { create(:country) }
     let!(:other_country_2) { create(:country) }
-
-    before { Spree::Config[:default_country_id] = default_country.id }
 
     context 'checkout zone not set' do
       before { subject.save! }
@@ -616,19 +621,60 @@ describe Spree::Store, type: :model do
     end
   end
 
+  describe '#can_be_deleted?' do
+    let(:default_store) { Spree::Store.default }
+
+    it 'cannot delete the only store' do
+      expect(default_store.can_be_deleted?).to eq(false)
+    end
+
+    it 'can delete when there are more than 1 stores' do
+      create(:store)
+      expect(default_store.can_be_deleted?).to eq(true)
+    end
+  end
+
   describe 'soft deletion' do
-    let!(:default_store) { create(:store) }
+    let!(:default_store) { described_class.default }
+    let(:another_store) { create(:store) }
 
-    let(:store) { create(:store) }
+    context 'default store' do
+      context 'with multiple stores' do
+        before { another_store }
 
-    it 'soft-deletes when destroy is called' do
-      store.destroy!
-      expect(store.deleted_at).not_to be_nil
+        it 'can be deleted' do
+          expect(default_store.deleted?).to eq(false)
+          expect { default_store.destroy }.to change(default_store, :deleted_at)
+          expect(default_store.deleted?).to eq(true)
+        end
+
+        it 'passes default flag to other store' do
+          expect(another_store.default?).to eq(false)
+          default_store.destroy
+          expect(default_store.default?).to eq(false)
+          expect(another_store.reload.default?).to eq(true)
+          expect(described_class.default).to eq(another_store)
+        end
+      end
+
+      context 'single store' do
+        it 'cannot be deleted' do
+          expect { default_store.destroy! }.to raise_error(ActiveRecord::RecordNotDestroyed)
+          expect(default_store.errors.full_messages.to_sentence).to eq('Cannot destroy the only Store.')
+        end
+      end
+    end
+
+    context 'another store' do
+      it 'soft-deletes when destroy is called' do
+        another_store.destroy!
+        expect(another_store.deleted_at).not_to be_nil
+      end
     end
 
     context 'with associations' do
       before do
-        store.products << create(:product)
+        another_store.products << create(:product)
       end
 
       it "doesn't destroy associations" do

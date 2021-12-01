@@ -16,7 +16,7 @@ module Spree
 
     before_validation :handle_slug
 
-    validates :title, :store, :locale, presence: true
+    validates :title, :store, :locale, :type, presence: true
     validates :slug, uniqueness: { scope: :store_id, allow_nil: true, case_sensitive: true }
     validates :locale, uniqueness: { scope: [:store, :type] }, if: :homepage?
 
@@ -28,7 +28,7 @@ module Spree
     scope :standard, -> { where(type: 'Spree::Cms::Pages::StandardPage') }
     scope :feature, -> { where(type: 'Spree::Cms::Pages::FeaturePage') }
 
-    self.whitelisted_ransackable_attributes = %w[title type locale store_id]
+    self.whitelisted_ransackable_attributes = %w[title type locale]
 
     def seo_title
       if meta_title.present?
@@ -38,7 +38,7 @@ module Spree
       end
     end
 
-    # Overide this if your page type uses cms_sections
+    # Override this if your page type uses cms_sections
     def sections?
       false
     end

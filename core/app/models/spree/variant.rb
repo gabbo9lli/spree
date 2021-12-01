@@ -4,6 +4,7 @@ module Spree
     acts_as_list scope: :product
 
     include MemoizedData
+    include Metadata
 
     MEMOIZED_METHODS = %w(purchasable in_stock backorderable tax_category options_text compare_at_price)
 
@@ -42,6 +43,10 @@ module Spree
              dependent: :destroy,
              inverse_of: :variant
 
+    has_many :wished_items, dependent: :destroy
+
+    has_many :digitals
+
     before_validation :set_cost_currency
 
     validate :check_price
@@ -52,7 +57,7 @@ module Spree
       validates :cost_price
       validates :price
     end
-    validates :sku, uniqueness: { conditions: -> { where(deleted_at: nil) }, case_sensitive: false },
+    validates :sku, uniqueness: { conditions: -> { where(deleted_at: nil) }, case_sensitive: false, scope: spree_base_uniqueness_scope },
                     allow_blank: true, unless: :disable_sku_validation?
 
     after_create :create_stock_items
@@ -89,7 +94,7 @@ module Spree
     scope :not_deleted, -> { where("#{Spree::Variant.quoted_table_name}.deleted_at IS NULL") }
 
     scope :for_currency_and_available_price_amount, ->(currency = nil) do
-      currency ||= Spree::Config[:currency]
+      currency ||= Spree::Store.default.default_currency
       joins(:prices).where('spree_prices.currency = ?', currency).where('spree_prices.amount IS NOT NULL').distinct
     end
 
@@ -106,8 +111,8 @@ module Spree
       end
     end
 
-    self.whitelisted_ransackable_associations = %w[option_values product prices default_price]
-    self.whitelisted_ransackable_attributes = %w[weight sku]
+    self.whitelisted_ransackable_associations = %w[option_values product tax_category prices default_price]
+    self.whitelisted_ransackable_attributes = %w[weight depth width height sku discontinue_on is_master cost_price cost_currency track_inventory deleted_at]
     self.whitelisted_ransackable_scopes = %i(product_name_or_sku_cont search_by_product_name_or_sku)
 
     def self.product_name_or_sku_cont(query)
@@ -125,6 +130,10 @@ module Spree
 
     def available?
       !discontinued? && product.available?
+    end
+
+    def in_stock_or_backorderable?
+      self.class.in_stock_or_backorderable.exists?(id: id)
     end
 
     def tax_category
@@ -276,10 +285,6 @@ module Spree
       track_inventory? && Spree::Config.track_inventory_levels
     end
 
-    def track_inventory
-      should_track_inventory?
-    end
-
     def volume
       (width || 0) * (height || 0) * (depth || 0)
     end
@@ -298,6 +303,11 @@ module Spree
 
     def backordered?
       @backordered ||= !in_stock? && stock_items.exists?(backorderable: true)
+    end
+
+    # Is this variant to be downloaded by the customer?
+    def digital?
+      digitals.present?
     end
 
     private
@@ -329,12 +339,12 @@ module Spree
         self.price = product.master.price
       end
       if price.present? && currency.nil?
-        self.currency = Spree::Config[:currency]
+        self.currency = Spree::Store.default.default_currency
       end
     end
 
     def set_cost_currency
-      self.cost_currency = Spree::Config[:currency] if cost_currency.blank?
+      self.cost_currency = Spree::Store.default.default_currency if cost_currency.blank?
     end
 
     def create_stock_items

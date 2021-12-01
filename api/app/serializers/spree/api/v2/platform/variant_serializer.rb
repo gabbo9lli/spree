@@ -3,8 +3,8 @@ module Spree
     module V2
       module Platform
         class VariantSerializer < BaseSerializer
-          include ::Spree::Api::V2::ResourceSerializerConcern
-          include ::Spree::Api::V2::DisplayMoneyHelper
+          include ResourceSerializerConcern
+          include DisplayMoneyHelper
 
           attributes :name, :options_text, :total_on_hand
 
@@ -46,6 +46,7 @@ module Spree
 
           belongs_to :product
           belongs_to :tax_category
+          has_many :digitals
           has_many :images
           has_many :option_values
           has_many :stock_items

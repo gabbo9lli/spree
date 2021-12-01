@@ -31,11 +31,26 @@ describe 'API V2 Storefront Cart Spec', type: :request do
     let(:params) { {} }
     let(:execute) { post '/api/v2/storefront/cart', headers: headers, params: params }
 
+    shared_examples 'sets public and private metadata' do
+      let(:params) do
+        {
+          public_metadata: { 'property1' => 'value1' },
+          private_metadata: { 'property2' => 'value2' }
+        }
+      end
+
+      it do
+        expect(order.public_metadata).to eq(params[:public_metadata])
+        expect(order.private_metadata).to eq(params[:private_metadata])
+      end
+    end
+
     shared_examples 'creates an order' do
       before { execute }
 
       it_behaves_like 'returns valid cart JSON'
       it_behaves_like 'returns 201 HTTP status'
+      it_behaves_like 'sets public and private metadata'
     end
 
     shared_examples 'creates an order with different currency' do
@@ -122,6 +137,7 @@ describe 'API V2 Storefront Cart Spec', type: :request do
             expect(json_response['data']).to have_attribute(:display_pre_tax_item_amount).with_value(new_order.display_pre_tax_item_amount.to_s)
             expect(json_response['data']).to have_attribute(:pre_tax_total).with_value(new_order.pre_tax_total.to_s)
             expect(json_response['data']).to have_attribute(:display_pre_tax_total).with_value(new_order.display_pre_tax_total.to_s)
+            expect(json_response['data']).to have_attribute(:public_metadata).with_value(new_order.public_metadata)
             expect(json_response['data']).to have_relationships(:user, :line_items, :variants, :billing_address, :shipping_address, :payments, :shipments, :promotions)
           end
 
@@ -146,7 +162,16 @@ describe 'API V2 Storefront Cart Spec', type: :request do
 
   describe 'cart#add_item' do
     let(:options) { {} }
-    let(:params) { { variant_id: variant.id, quantity: 5, options: options, include: 'variants' } }
+    let(:params) do
+      {
+        variant_id: variant.id,
+        quantity: 5,
+        public_metadata: { 'prop1' => 'value1' },
+        private_metadata: { 'prop2' => 'value2' },
+        options: options,
+        include: 'variants'
+      }
+    end
     let(:execute) { post '/api/v2/storefront/cart/add_item', params: params, headers: headers }
 
     before do
@@ -160,9 +185,13 @@ describe 'API V2 Storefront Cart Spec', type: :request do
       it_behaves_like 'returns valid cart JSON'
 
       it 'with success' do
+        order.reload
+
         expect(order.line_items.count).to eq(2)
         expect(order.line_items.last.variant).to eq(variant)
         expect(order.line_items.last.quantity).to eq(5)
+        expect(order.line_items.last.public_metadata).to eq(params[:public_metadata])
+        expect(order.line_items.last.private_metadata).to eq(params[:private_metadata])
         expect(json_response['included']).to include(have_type('variant').and(have_id(variant.id.to_s)))
       end
 
@@ -170,6 +199,8 @@ describe 'API V2 Storefront Cart Spec', type: :request do
         let(:options) { { cost_price: 1.99 } }
 
         it 'sets custom attributes values' do
+          order.reload
+
           expect(order.line_items.last.cost_price).to eq(1.99)
         end
       end
@@ -215,14 +246,28 @@ describe 'API V2 Storefront Cart Spec', type: :request do
       end
     end
 
+    shared_examples 'doesnt add item if metadata is not a hash' do
+      before do
+        params[:public_metadata] = [1, 2, 3]
+        execute
+      end
+
+      it_behaves_like 'returns 422 HTTP status'
+
+      it 'return an error' do
+        expect(json_response[:error]).to eq(I18n.t(:invalid_params, scope: 'spree.api.v2.metadata'))
+      end
+    end
+
     context 'as a signed in user' do
-      include_context 'creates order with line item'
+      include_context 'order with a physical line item'
 
       context 'with existing order' do
         it_behaves_like 'adds item'
         it_behaves_like 'doesnt add item with quantity unnavailble'
         it_behaves_like 'doesnt add item from different store'
         it_behaves_like 'doesnt add non-existing item'
+        it_behaves_like 'doesnt add item if metadata is not a hash'
       end
 
       it_behaves_like 'no current order'
@@ -236,6 +281,7 @@ describe 'API V2 Storefront Cart Spec', type: :request do
         it_behaves_like 'doesnt add item with quantity unnavailble'
         it_behaves_like 'doesnt add item from different store'
         it_behaves_like 'doesnt add non-existing item'
+        it_behaves_like 'doesnt add item if metadata is not a hash'
       end
 
       it_behaves_like 'no current order'
@@ -267,7 +313,7 @@ describe 'API V2 Storefront Cart Spec', type: :request do
     end
 
     context 'as a signed in user' do
-      include_context 'creates order with line item'
+      include_context 'order with a physical line item'
 
       context 'with existing order' do
         it_behaves_like 'removes line item'
@@ -303,7 +349,7 @@ describe 'API V2 Storefront Cart Spec', type: :request do
 
     context 'as a signed in user' do
       context 'with existing order with line item' do
-        include_context 'creates order with line item'
+        include_context 'order with a physical line item'
 
         it_behaves_like 'emptying the order'
       end
@@ -339,7 +385,7 @@ describe 'API V2 Storefront Cart Spec', type: :request do
 
     context 'as a signed in user' do
       context 'with existing order with line item' do
-        include_context 'creates order with line item'
+        include_context 'order with a physical line item'
 
         it_behaves_like 'destroying order'
         it_behaves_like '204 status returned'
@@ -433,7 +479,7 @@ describe 'API V2 Storefront Cart Spec', type: :request do
     end
 
     context 'as a signed in user' do
-      include_context 'creates order with line item'
+      include_context 'order with a physical line item'
 
       it_behaves_like 'set quantity'
     end
@@ -466,7 +512,7 @@ describe 'API V2 Storefront Cart Spec', type: :request do
     end
 
     context 'with existing user order with line item' do
-      include_context 'creates order with line item'
+      include_context 'order with a physical line item'
 
       it_behaves_like 'showing the cart'
     end
@@ -509,7 +555,7 @@ describe 'API V2 Storefront Cart Spec', type: :request do
 
       context 'as a signed user' do
         context 'with valid currency param' do
-          include_context 'creates order with line item'
+          include_context 'order with a physical line item'
           it_behaves_like 'showing the cart'
 
           it 'includes the requested currency' do
@@ -519,7 +565,7 @@ describe 'API V2 Storefront Cart Spec', type: :request do
         end
 
         context 'with invalid currency param' do
-          include_context 'creates order with line item'
+          include_context 'order with a physical line item'
           it_behaves_like 'showing the cart'
 
           it 'includes the requested currency' do
@@ -535,7 +581,7 @@ describe 'API V2 Storefront Cart Spec', type: :request do
       let(:bill_addr_params) { { include: 'billing_address' } }
       let(:ship_addr_params) { { include: 'shipping_address' } }
 
-      include_context 'creates order with line item'
+      include_context 'order with a physical line item'
       it_behaves_like 'showing the cart'
 
       it 'will return included bill_address' do
@@ -554,6 +600,7 @@ describe 'API V2 Storefront Cart Spec', type: :request do
         expect(json_response[:included][0]).to have_attribute(:country_name).with_value(order.bill_address.country_name)
         expect(json_response[:included][0]).to have_attribute(:country_iso3).with_value(order.bill_address.country_iso3)
         expect(json_response[:included][0]).to have_attribute(:state_code).with_value(order.bill_address.state_abbr)
+        expect(json_response[:included][0]).to have_attribute(:public_metadata).with_value(order.bill_address.public_metadata)
       end
 
       it 'will return included ship_address' do
@@ -576,6 +623,7 @@ describe 'API V2 Storefront Cart Spec', type: :request do
         expect(json_response[:included][0]).to have_attribute(:country_name).with_value(order.ship_address.country_name)
         expect(json_response[:included][0]).to have_attribute(:country_iso3).with_value(order.ship_address.country_iso3)
         expect(json_response[:included][0]).to have_attribute(:state_code).with_value(order.ship_address.state_abbr)
+        expect(json_response[:included][0]).to have_attribute(:public_metadata).with_value(order.ship_address.public_metadata)
       end
     end
   end
@@ -637,7 +685,7 @@ describe 'API V2 Storefront Cart Spec', type: :request do
     end
 
     context 'as a signed in user' do
-      include_context 'creates order with line item'
+      include_context 'order with a physical line item'
 
       context 'with existing order' do
         it_behaves_like 'apply coupon code'
@@ -827,7 +875,7 @@ describe 'API V2 Storefront Cart Spec', type: :request do
     end
 
     context 'as a signed in user' do
-      include_context 'creates order with line item'
+      include_context 'order with a physical line item'
 
       it_behaves_like 'remove coupon code'
     end
@@ -838,7 +886,7 @@ describe 'API V2 Storefront Cart Spec', type: :request do
     let(:params) { { country_iso: 'USA' } }
     let(:execute) { get '/api/v2/storefront/cart/estimate_shipping_rates', params: params, headers: headers }
 
-    let(:country) { create(:country, iso: 'USA') }
+    let(:country) { store.default_country }
     let(:zone) { create(:zone, name: 'US') }
     let(:shipping_method) { create(:shipping_method) }
     let(:shipping_method_2) { create(:shipping_method) }
@@ -883,7 +931,7 @@ describe 'API V2 Storefront Cart Spec', type: :request do
     end
 
     context 'as a signed in user' do
-      include_context 'creates order with line item'
+      include_context 'order with a physical line item'
 
       it_behaves_like 'returns a list of shipments with shipping rates'
     end

@@ -3,10 +3,11 @@ require_dependency 'spree/payment/processing'
 module Spree
   class Payment < Spree::Base
     include Spree::Core::NumberGenerator.new(prefix: 'P', letters: true, length: 7)
+    include NumberIdentifier
+    include NumberAsParam
+    include Metadata
 
     include Spree::Payment::Processing
-
-    include NumberAsParam
 
     NON_RISKY_AVS_CODES = ['B', 'D', 'H', 'J', 'M', 'Q', 'T', 'V', 'X', 'Y'].freeze
     RISKY_AVS_CODES     = ['A', 'C', 'E', 'F', 'G', 'I', 'K', 'L', 'N', 'O', 'P', 'R', 'S', 'U', 'W', 'Z'].freeze
@@ -25,8 +26,8 @@ module Spree
     has_many :refunds, inverse_of: :payment
 
     validates :payment_method, presence: true
-    validates :number, uniqueness: { case_sensitive: true }
     validates :source, presence: true, if: -> { payment_method&.source_required? }
+    validate :payment_method_available_for_order, on: :create
 
     before_validation :validate_source
 
@@ -66,6 +67,9 @@ module Spree
     scope :store_credits, -> { where(source_type: Spree::StoreCredit.to_s) }
     scope :not_store_credits, -> { where(arel_table[:source_type].not_eq(Spree::StoreCredit.to_s).or(arel_table[:source_type].eq(nil))) }
 
+    self.whitelisted_ransackable_associations = %w[payment_method order source]
+    self.whitelisted_ransackable_attributes = %w[number amount state response_code avs_response cvv_response_code cvv_response_message]
+
     # transaction_id is much easier to understand
     def transaction_id
       response_code
@@ -95,10 +99,12 @@ module Spree
       event :complete do
         transition from: [:processing, :pending, :checkout], to: :completed
       end
+      after_transition to: :completed, do: :after_completed
       event :void do
         transition from: [:pending, :processing, :completed, :checkout], to: :void
       end
-      # when the card brand isnt supported
+      after_transition to: :void, do: :after_void
+      # when the card brand isn't supported
       event :invalidate do
         transition from: [:checkout], to: :invalid
       end
@@ -196,6 +202,14 @@ module Spree
 
     private
 
+    def after_void
+      # this method is prepended in api/ to queue Webhooks requests
+    end
+
+    def after_completed
+      # this method is prepended in api/ to queue Webhooks requests
+    end
+
     def has_invalid_state?
       INVALID_STATES.include?(state)
     end
@@ -217,6 +231,13 @@ module Spree
         end
       end
       !errors.present?
+    end
+
+    def payment_method_available_for_order
+      return if payment_method.blank?
+      return if order.blank?
+
+      errors.add(:payment_method, :invalid) if !payment_method.available_for_order?(order) || !payment_method.available_for_store?(order.store)
     end
 
     def add_source_error(field, message)

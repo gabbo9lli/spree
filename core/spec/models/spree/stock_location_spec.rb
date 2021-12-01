@@ -7,8 +7,22 @@ module Spree
     let(:stock_item) { subject.stock_items.order(:id).first }
     let(:variant) { stock_item.variant }
 
-    it 'creates stock_items for all variants' do
-      expect(subject.stock_items.count).to eq Variant.count
+    context 'handling the stock items creation after create' do
+      let!(:variant) { create(:variant) }
+
+      before { StockLocation.destroy_all }
+
+      it 'creates stock_items for all variants' do
+        expect do
+          create(:stock_location)
+        end.to(
+          change { Variant.count }.by(0).and(
+            change { StockLocation.count }.from(0).to(1).and(
+              change { StockItem.count }.from(0).to(2)
+            )
+          )
+        )
+      end
     end
 
     it 'validates uniqueness' do
@@ -68,7 +82,10 @@ module Spree
             before { subject.propagate_all_variants = true }
 
             specify do
-              expect(subject).to receive(:create_stock_items)
+              expect(subject).to receive(:create_stock_items).and_call_original
+              expect(Spree::StockLocations::StockItems::CreateJob).to(
+                receive(:perform_later).once.with(subject)
+              )
               subject.save!
             end
           end
@@ -77,7 +94,7 @@ module Spree
             before { subject.propagate_all_variants = false }
 
             specify do
-              expect(subject).not_to receive(:propagate_variant)
+              expect(subject).not_to receive(:create_stock_items)
               subject.save!
             end
           end
@@ -102,15 +119,43 @@ module Spree
     end
 
     describe '#stock_item_or_create' do
-      before do
-        variant = create(:variant)
-        variant.stock_items.destroy_all
-        variant.save
+      context 'without stock item' do
+        let!(:variant) { create(:variant) }
+
+        before { variant.stock_items.destroy_all }
+
+        context 'variant instance passed' do
+          it 'creates a stock_item if not found for a variant' do
+            stock_item = subject.stock_item_or_create(variant)
+            expect(stock_item.variant).to eq variant
+          end
+
+          it { expect { subject.stock_item_or_create(variant) }.to change(Spree::StockItem, :count) }
+        end
+
+        context 'variant ID passed' do
+          it 'creates a stock_item if not found for a variant' do
+            stock_item = subject.stock_item_or_create(variant.id)
+            expect(stock_item.variant).to eq variant
+          end
+
+          it { expect { subject.stock_item_or_create(variant.id) }.to change(Spree::StockItem, :count) }
+        end
       end
 
-      it 'creates a stock_item if not found for a variant' do
-        stock_item = subject.stock_item_or_create(variant)
-        expect(stock_item.variant).to eq variant
+      context 'with stock item' do
+        let!(:variant) { create(:variant) }
+        let!(:stock_item) { create(:stock_item, variant: variant, stock_location: subject) }
+
+        context 'variant instance passed' do
+          it { expect { subject.stock_item_or_create(variant) }.not_to change(Spree::StockItem, :count) }
+          it { expect(subject.stock_item_or_create(variant)).to eq(stock_item) }
+        end
+
+        context 'variant ID passed' do
+          it { expect { subject.stock_item_or_create(variant.id) }.not_to change(Spree::StockItem, :count) }
+          it { expect(subject.stock_item_or_create(variant.id)).to eq(stock_item) }
+        end
       end
     end
 
@@ -161,6 +206,10 @@ module Spree
     end
 
     context 'fill_status' do
+      let(:zero_stock_item) { subject.stock_items.order(:id).second }
+
+      before { allow(zero_stock_item).to receive_messages(backorderable?: true, count_on_hand: 0) }
+
       it 'all on_hand with no backordered' do
         on_hand, backordered = subject.fill_status(variant, 5)
         expect(on_hand).to eq 5
@@ -174,9 +223,6 @@ module Spree
       end
 
       it 'zero on_hand with all backordered' do
-        zero_stock_item = mock_model(StockItem,
-                                     count_on_hand: 0,
-                                     backorderable?: true)
         expect(subject).to receive(:stock_item).with(variant).and_return(zero_stock_item)
 
         on_hand, backordered = subject.fill_status(variant, 20)
@@ -186,12 +232,12 @@ module Spree
 
       context 'when backordering is not allowed' do
         before do
-          @stock_item = mock_model(StockItem, backorderable?: false)
-          expect(subject).to receive(:stock_item).with(variant).and_return(@stock_item)
+          allow(stock_item).to receive_messages backorderable?: false
+          expect(subject).to receive(:stock_item).with(variant).and_return(stock_item)
         end
 
         it 'all on_hand' do
-          allow(@stock_item).to receive_messages(count_on_hand: 10)
+          allow(stock_item).to receive_messages(count_on_hand: 10)
 
           on_hand, backordered = subject.fill_status(variant, 5)
           expect(on_hand).to eq 5
@@ -199,7 +245,7 @@ module Spree
         end
 
         it 'some on_hand' do
-          allow(@stock_item).to receive_messages(count_on_hand: 10)
+          allow(stock_item).to receive_messages(count_on_hand: 10)
 
           on_hand, backordered = subject.fill_status(variant, 20)
           expect(on_hand).to eq 10
@@ -207,7 +253,7 @@ module Spree
         end
 
         it 'zero on_hand' do
-          allow(@stock_item).to receive_messages(count_on_hand: 0)
+          allow(stock_item).to receive_messages(count_on_hand: 0)
 
           on_hand, backordered = subject.fill_status(variant, 20)
           expect(on_hand).to eq 0
@@ -240,17 +286,17 @@ module Spree
       context 'both name and abbr is present' do
         subject { StockLocation.create(name: 'testing', state: state, state_name: nil) }
 
-        let(:state) { stub_model(Spree::State, name: 'virginia', abbr: 'va') }
+        let(:state) { create(:state, name: 'virginia', abbr: 'va') }
 
-        specify { expect(subject.state_text).to eq('va') }
+        specify { expect(subject.state_text).to eq(state.abbr) }
       end
 
       context 'only name is present' do
         subject { StockLocation.create(name: 'testing', state: state, state_name: nil) }
 
-        let(:state) { stub_model(Spree::State, name: 'virginia', abbr: nil) }
+        let(:state) { create(:state, name: 'virginia', abbr: nil) }
 
-        specify { expect(subject.state_text).to eq('virginia') }
+        specify { expect(subject.state_text).to eq(state.name) }
       end
     end
 

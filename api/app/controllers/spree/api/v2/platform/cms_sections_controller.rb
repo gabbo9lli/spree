@@ -3,29 +3,24 @@ module Spree
     module V2
       module Platform
         class CmsSectionsController < ResourceController
-          before_action -> { doorkeeper_authorize! :write, :admin }, only: WRITE_ACTIONS << :reposition
-
-          def reposition
-            spree_authorize! :update, @moved_section if spree_current_user.present?
-
-            @moved_section = scope.find(params[:section_id])
-            new_index = params[:new_position_idx].to_i + 1
-
-            if @moved_section && new_index
-              @moved_section.set_list_position(new_index)
-            else
-              head :bad_request
-            end
-
-            if @moved_section.save
-              head :no_content
-            end
-          end
-
           private
 
           def model_class
             Spree::CmsSection
+          end
+
+          def spree_permitted_attributes
+            stored_attributes = []
+
+            Spree::CmsSection::TYPES.each do |type|
+              type.constantize.stored_attributes.each do |_name, values|
+                values.each do |value|
+                  stored_attributes << value
+                end
+              end
+            end
+
+            super + stored_attributes.compact.uniq!
           end
         end
       end

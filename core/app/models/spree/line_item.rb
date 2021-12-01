@@ -1,5 +1,7 @@
 module Spree
   class LineItem < Spree::Base
+    include Metadata
+
     before_validation :ensure_valid_quantity
 
     with_options inverse_of: :line_items do
@@ -12,6 +14,7 @@ module Spree
 
     has_many :adjustments, as: :adjustable, dependent: :destroy
     has_many :inventory_units, inverse_of: :line_item
+    has_many :digital_links, dependent: :destroy
 
     before_validation :copy_price
     before_validation :copy_tax_category
@@ -27,7 +30,7 @@ module Spree
 
     validates :price, numericality: true
 
-    validates_with Spree::Stock::AvailabilityValidator
+    validates_with Spree::Stock::AvailabilityValidator, if: -> { variant.present? }
     validate :ensure_proper_currency, if: -> { order.present? }
 
     before_destroy :verify_order_inventory_before_destroy, if: -> { order.has_checkout_step?('delivery') }
@@ -42,11 +45,16 @@ module Spree
     delegate :name, :description, :sku, :should_track_inventory?, :product, :options_text, :slug, :product_id, to: :variant
     delegate :brand, :category, to: :product
     delegate :tax_zone, to: :order
+    delegate :digital?, to: :variant
 
     attr_accessor :target_shipment
 
-    self.whitelisted_ransackable_associations = ['variant']
-    self.whitelisted_ransackable_attributes = ['variant_id']
+    self.whitelisted_ransackable_associations = %w[variant order tax_category]
+    self.whitelisted_ransackable_attributes = %w[variant_id order_id tax_category_id quantity
+                                                 price cost_price cost_currency adjustment_total
+                                                 additional_tax_total promo_total included_tax_total
+                                                 pre_tax_amount taxable_adjustment_total
+                                                 non_taxable_adjustment_total]
 
     def copy_price
       if variant

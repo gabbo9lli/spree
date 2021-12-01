@@ -1,5 +1,7 @@
 module Spree
   class Zone < Spree::Base
+    include UniqueName
+
     with_options dependent: :destroy, inverse_of: :zone do
       has_many :zone_members, class_name: 'Spree::ZoneMember'
       has_many :tax_rates
@@ -11,8 +13,6 @@ module Spree
 
     has_many :shipping_method_zones, class_name: 'Spree::ShippingMethodZone'
     has_many :shipping_methods, through: :shipping_method_zones, class_name: 'Spree::ShippingMethod'
-
-    validates :name, presence: true, uniqueness: { case_sensitive: false, allow_blank: true }
 
     scope :with_default_tax, -> { where(default_tax: true) }
 
@@ -71,7 +71,9 @@ module Spree
     end
 
     def self.default_checkout_zone
-      find_by(name: Spree::Config[:checkout_zone])
+      ActiveSupport::Deprecation.warn('Spree::Zone.default_checkout_zone is deprecated and will be removed in Spree 5')
+
+      first
     end
 
     def kind
@@ -109,10 +111,10 @@ module Spree
     def country_list
       @countries ||= case kind
                      when 'country' then
-                       zoneables
+                       Country.where(id: country_ids)
                      when 'state' then
-                       zoneables.collect(&:country)
-                     end.flatten.compact.uniq
+                       Country.where(id: zoneables.collect(&:country_id))
+                     end
     end
 
     def <=>(other)

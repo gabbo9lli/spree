@@ -83,6 +83,11 @@ module Spree
                     order.process_payments!
                   end
                 end
+
+                before_transition to: :complete do |order|
+                  order.create_digital_links if order.some_digital?
+                end
+
                 after_transition to: :complete, do: :persist_user_credit_card
                 before_transition to: :payment, do: :set_shipments_cost
                 before_transition to: :payment, do: :create_tax_charge!
@@ -107,6 +112,7 @@ module Spree
 
               before_transition to: :resumed, do: :ensure_line_item_variants_are_not_discontinued
               before_transition to: :resumed, do: :ensure_line_items_are_in_stock
+              before_transition to: :resumed, do: proc { |order| order.state_machine_resumed = true }
 
               after_transition to: :complete, do: :finalize!
               after_transition to: :resumed, do: :after_resume
@@ -220,7 +226,7 @@ module Spree
             @updating_params = params
             run_callbacks :updating_from_params do
               # Set existing card after setting permitted parameters because
-              # rails would slice parameters containg ruby objects, apparently
+              # rails would slice parameters containing ruby objects, apparently
               existing_card_id = @updating_params[:order] ? @updating_params[:order].delete(:existing_card) : nil
 
               attributes = if @updating_params[:order]

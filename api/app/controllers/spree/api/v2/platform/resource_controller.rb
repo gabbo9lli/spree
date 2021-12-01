@@ -3,21 +3,17 @@ module Spree
     module V2
       module Platform
         class ResourceController < ::Spree::Api::V2::ResourceController
-          READ_ACTIONS = %i[show index]
-          WRITE_ACTIONS = %i[create update destroy]
-
           # doorkeeper scopes usage: https://github.com/doorkeeper-gem/doorkeeper/wiki/Using-Scopes
-          before_action -> { doorkeeper_authorize! :read, :admin }, only: READ_ACTIONS
-          before_action -> { doorkeeper_authorize! :write, :admin }, only: WRITE_ACTIONS
+          before_action -> { doorkeeper_authorize! :read, :admin }
+          before_action -> { doorkeeper_authorize! :write, :admin }, if: :write_request?
 
           # optional authorization if using a user token instead of app token
-          before_action :authorize_spree_user, only: WRITE_ACTIONS
+          before_action :authorize_spree_user
 
-          # index and show acrtions are defined in Spree::Api::V2::ResourceController
+          # index and show actions are defined in Spree::Api::V2::ResourceController
 
           def create
             resource = model_class.new(permitted_resource_params)
-
             ensure_current_store(resource)
 
             if resource.save
@@ -28,8 +24,10 @@ module Spree
           end
 
           def update
-            if resource.update(permitted_resource_params)
-              ensure_current_store(resource)
+            resource.assign_attributes(permitted_resource_params)
+            ensure_current_store(resource)
+
+            if resource.save
               render_serialized_payload { serialize_resource(resource) }
             else
               render_error_payload(resource.errors)
@@ -47,14 +45,15 @@ module Spree
           protected
 
           def resource_serializer
-            "Spree::Api::V2::Platform::#{model_class.to_s.demodulize}Serializer".constantize
+            serializer_base_name = model_class.to_s.sub('Spree::', '')
+            "Spree::Api::V2::Platform::#{serializer_base_name}Serializer".constantize
           end
 
           def collection_serializer
             resource_serializer
           end
 
-          # overwiting to utilize ransack gem for filtering
+          # overwriting to utilize ransack gem for filtering
           # https://github.com/activerecord-hackery/ransack#search-matchers
           def collection
             @collection ||= scope.ransack(params[:filter]).result
@@ -74,7 +73,7 @@ module Spree
             return nil if doorkeeper_token.resource_owner_id.nil?
             return @spree_current_user if @spree_current_user
 
-            @spree_current_user ||= Spree.user_class.find_by(id: doorkeeper_token.resource_owner_id)
+            @spree_current_user ||= doorkeeper_token.resource_owner
           end
 
           def access_denied(exception)
@@ -86,10 +85,17 @@ module Spree
           def authorize_spree_user
             return if spree_current_user.nil?
 
-            if action_name == 'create'
+            case action_name
+            when 'create'
               spree_authorize! :create, model_class
+            when 'destroy'
+              spree_authorize! :destroy, resource
+            when 'index'
+              spree_authorize! :read, model_class
+            when 'show'
+              spree_authorize! :read, resource
             else
-              spree_authorize! action_name, resource
+              spree_authorize! :update, resource
             end
           end
 
@@ -98,7 +104,21 @@ module Spree
           end
 
           def spree_permitted_attributes
-            Spree::PermittedAttributes.try("#{model_param_name}_attributes") || {}
+            store_ids = if model_class.method_defined?(:stores)
+                          [{ store_ids: [] }]
+                        else
+                          []
+                        end
+
+            model_class.json_api_permitted_attributes + store_ids + metadata_params
+          end
+
+          def metadata_params
+            if model_class.include?(Metadata)
+              [{ public_metadata: {}, private_metadata: {} }]
+            else
+              []
+            end
           end
 
           def permitted_resource_params
@@ -107,6 +127,10 @@ module Spree
 
           def allowed_sort_attributes
             (super << spree_permitted_attributes).uniq.compact
+          end
+
+          def write_request?
+            %w[put patch post delete].include?(request.request_method.downcase)
           end
         end
       end

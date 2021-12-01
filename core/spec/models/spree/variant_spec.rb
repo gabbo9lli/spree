@@ -6,6 +6,7 @@ describe Spree::Variant, type: :model do
   let(:master_variant) { create(:master_variant) }
 
   it_behaves_like 'default_price'
+  it_behaves_like 'metadata'
 
   context 'sorting' do
     it 'responds to set_list_position' do
@@ -314,6 +315,52 @@ describe Spree::Variant, type: :model do
     it 'uses LocalizedNumber.parse' do
       expect(Spree::LocalizedNumber).to receive(:parse).with('1,599.99')
       subject.cost_price = '1,599.99'
+    end
+  end
+
+  context '#in_stock_or_backorderable?' do
+    subject { variant.in_stock_or_backorderable? }
+
+    let!(:variant) { create(:variant) }
+
+    context 'when variant has no stock items' do
+      before { Spree::StockItem.delete_all }
+
+      it { expect(subject).to eq(false) }
+    end
+
+    context 'when variant has stock items' do
+      let!(:variant2) { create(:variant) }
+
+      before { Spree::StockItem.update_all(backorderable: false) }
+
+      context 'when variant stock items count_on_hand > 0' do
+        before { variant.stock_items.first.set_count_on_hand(1) }
+
+        it { expect(subject).to eq(true) }
+      end
+
+      context 'when variant stock items count_on_hand <= 0' do
+        before { variant.stock_items.first.set_count_on_hand(0) }
+
+        it { expect(subject).to eq(false) }
+
+        context 'when variant track_inventory = false' do
+          before { variant.update(track_inventory: false) }
+
+          it { expect(subject).to eq(true) }
+        end
+
+        context 'when variant track_inventory = true' do
+          it { expect(variant.in_stock_or_backorderable?).to eq(false) }
+
+          context 'with some variant stock item having backorderable = true' do
+            before { variant.stock_items.first.update(backorderable: true) }
+
+            it { expect(subject).to eq(true) }
+          end
+        end
+      end
     end
   end
 
@@ -865,7 +912,7 @@ describe Spree::Variant, type: :model do
       context 'price present and currency nil' do
         before { variant.currency = nil }
 
-        it { expect(variant.send(:check_price)).to be(Spree::Config[:currency]) }
+        it { expect(variant.send(:check_price)).to eq(Spree::Store.default.default_currency) }
       end
 
       context 'price nil and currency present' do
@@ -891,7 +938,7 @@ describe Spree::Variant, type: :model do
       context 'price present and currency nil' do
         before { variant.currency = nil }
 
-        it { expect(variant.send(:check_price)).to be(Spree::Config[:currency]) }
+        it { expect(variant.send(:check_price)).to eq(Spree::Store.default.default_currency) }
       end
 
       context 'product and master_variant present and equal' do

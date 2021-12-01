@@ -1,5 +1,6 @@
 require_dependency 'spree/order/checkout'
 require_dependency 'spree/order/currency_updater'
+require_dependency 'spree/order/digital'
 require_dependency 'spree/order/payments'
 require_dependency 'spree/order/store_credit'
 require_dependency 'spree/order/emails'
@@ -11,6 +12,7 @@ module Spree
 
     include Spree::Order::Checkout
     include Spree::Order::CurrencyUpdater
+    include Spree::Order::Digital
     include Spree::Order::Payments
     include Spree::Order::StoreCredit
     include Spree::Order::AddressBook
@@ -18,9 +20,11 @@ module Spree
     include Spree::Core::NumberGenerator.new(prefix: 'R')
     include Spree::Core::TokenGenerator
 
+    include NumberIdentifier
     include NumberAsParam
     include SingleStoreResource
     include MemoizedData
+    include Metadata
 
     MEMOIZED_METHODS = %w(tax_zone)
 
@@ -54,26 +58,34 @@ module Spree
 
     checkout_flow do
       go_to_state :address
-      go_to_state :delivery
+      go_to_state :delivery, if: ->(order) { order.delivery_required? }
       go_to_state :payment, if: ->(order) { order.payment? || order.payment_required? }
       go_to_state :confirm, if: ->(order) { order.confirmation_required? }
       go_to_state :complete
       remove_transition from: :delivery, to: :confirm, unless: ->(order) { order.confirmation_required? }
     end
 
-    self.whitelisted_ransackable_associations = %w[shipments user promotions bill_address ship_address line_items store]
-    self.whitelisted_ransackable_attributes = %w[completed_at email number state payment_state shipment_state total considered_risky channel]
+    self.whitelisted_ransackable_associations = %w[shipments user created_by approver canceler promotions bill_address ship_address line_items store]
+    self.whitelisted_ransackable_attributes = %w[
+      completed_at email number state payment_state shipment_state
+      total item_total considered_risky channel
+    ]
 
     attr_reader :coupon_code
     attr_accessor :temporary_address, :temporary_credit_card
 
+    attribute :state_machine_resumed, :boolean
+
     if Spree.user_class
       belongs_to :user, class_name: Spree.user_class.to_s, optional: true
-      belongs_to :created_by, class_name: Spree.user_class.to_s, optional: true
-      belongs_to :approver, class_name: Spree.user_class.to_s, optional: true
-      belongs_to :canceler, class_name: Spree.user_class.to_s, optional: true
     else
       belongs_to :user, optional: true
+    end
+    if Spree.admin_user_class
+      belongs_to :created_by, class_name: Spree.admin_user_class.to_s, optional: true
+      belongs_to :approver, class_name: Spree.admin_user_class.to_s, optional: true
+      belongs_to :canceler, class_name: Spree.admin_user_class.to_s, optional: true
+    else
       belongs_to :created_by, optional: true
       belongs_to :approver, optional: true
       belongs_to :canceler, optional: true
@@ -128,7 +140,6 @@ module Spree
     # Needs to happen before save_permalink is called
     before_validation :ensure_store_presence
     before_validation :ensure_currency_presence
-    before_validation :uppercase_number
 
     before_validation :clone_billing_address, if: :use_billing?
     attr_accessor :use_billing
@@ -140,7 +151,6 @@ module Spree
     with_options presence: true do
       # we want to have this case_sentive: true as changing it to false causes all SQL to use LOWER(slug)
       # which is very costly and slow on large set of records
-      validates :number, length: { maximum: 32, allow_blank: true }, uniqueness: { allow_blank: true, case_sensitive: true }
       validates :email, length: { maximum: 254, allow_blank: true }, email: { allow_blank: true }, if: :require_email
       validates :item_count, numericality: { greater_than_or_equal_to: 0, less_than: 2**31, only_integer: true, allow_blank: true }
       validates :store
@@ -181,7 +191,7 @@ module Spree
       update_hooks.add(hook)
     end
 
-    # For compatiblity with Calculator::PriceSack
+    # For compatibility with Calculator::PriceSack
     def amount
       line_items.inject(0.0) { |sum, li| sum + li.amount }
     end
@@ -210,6 +220,11 @@ module Spree
     # own application if you require additional steps before allowing a checkout.
     def checkout_allowed?
       line_items.exists?
+    end
+
+    # Does this order require a physical delivery.
+    def delivery_required?
+      !digital?
     end
 
     # Is this a free order in which case the payment step should be skipped
@@ -386,7 +401,7 @@ module Spree
 
     # Helper methods for checkout steps
     def paid?
-      payment_state == 'paid' || payment_state == 'credit_owed'
+      payments.valid.completed.size == payments.valid.size && payments.valid.sum(:amount) >= total
     end
 
     def available_payment_methods(store = nil)
@@ -474,6 +489,10 @@ module Spree
 
     def shipped?
       %w(partial shipped).include?(shipment_state)
+    end
+
+    def fully_shipped?
+      shipments.shipped.size == shipments.size
     end
 
     def create_proposed_shipments
@@ -618,17 +637,14 @@ module Spree
       promotions.pluck(:code).compact.first
     end
 
-    def payments_attributes=(attributes)
-      validate_payments_attributes(attributes)
-      super(attributes)
-    end
-
     def validate_payments_attributes(attributes)
+      ActiveSupport::Deprecation.warn('`Order#validate_payments_attributes` is deprecated and will be removed in Spree 5')
+
       # Ensure the payment methods specified are allowed for this user
-      payment_method_ids = available_payment_methods.map(&:id)
+      payment_method_ids = available_payment_methods.map(&:id).map(&:to_s)
 
       attributes.each do |payment_attributes|
-        payment_method_id = payment_attributes[:payment_method_id].to_i
+        payment_method_id = payment_attributes[:payment_method_id].to_s
 
         raise ActiveRecord::RecordNotFound unless payment_method_ids.include?(payment_method_id)
       end
@@ -711,7 +727,7 @@ module Spree
     end
 
     def ensure_currency_presence
-      self.currency ||= store.default_currency || Spree::Config[:currency]
+      self.currency ||= store.default_currency
     end
 
     def create_token
@@ -729,10 +745,6 @@ module Spree
 
     def credit_card_nil_payment?(attributes)
       payments.store_credits.present? && attributes[:amount].to_f.zero?
-    end
-
-    def uppercase_number
-      number&.upcase!
     end
   end
 end

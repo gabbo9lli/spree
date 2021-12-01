@@ -3,7 +3,6 @@
 # the one component of Spree.
 source 'https://rubygems.org'
 
-gem 'sqlite3', '~> 1.4.0', platforms: [:ruby, :mingw, :mswin, :x64_mingw]
 gem 'tzinfo-data', platforms: [:mingw, :mswin, :x64_mingw]
 
 %w[
@@ -15,19 +14,27 @@ end
 
 platforms :jruby do
   gem 'jruby-openssl'
-  gem 'activerecord-jdbcsqlite3-adapter'
 end
 
 platforms :ruby do
-  gem 'mysql2'
-  gem 'pg', '~> 1.1'
+  if ENV['DB'] == 'mysql'
+    gem 'mysql2'
+  else
+    gem 'pg', '~> 1.1'
+  end
+end
+
+if ENV['RAILS_VERSION']&.match(/7\.0\.0/)
+  gem 'paranoia', github: 'damianlegawiec/paranoia', branch: 'core'
+  gem 'awesome_nested_set', github: 'damianlegawiec/awesome_nested_set', branch: 'master'
+  gem 'ransack', github: 'activerecord-hackery/ransack', branch: 'master'
 end
 
 group :test do
   gem 'capybara', '~> 3.24'
   gem 'capybara-screenshot', '~> 1.0'
   gem 'capybara-select-2'
-  gem 'database_cleaner', '~> 1.3'
+  gem 'database_cleaner-active_record'
   gem 'email_spec'
   gem 'factory_bot_rails', '~> 6.0'
   gem 'multi_json'
@@ -46,8 +53,9 @@ end
 group :test, :development do
   gem 'awesome_print'
   gem 'gem-release'
+  gem 'i18n-tasks'
   gem 'redis'
-  gem 'rubocop', '~> 1.0.0', require: false # bumped
+  gem 'rubocop', '~> 1.0', require: false
   gem 'rubocop-rspec', require: false
   gem 'pry-byebug'
   gem 'webdrivers', '~> 4.1'

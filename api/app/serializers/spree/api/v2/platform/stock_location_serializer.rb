@@ -3,12 +3,10 @@ module Spree
     module V2
       module Platform
         class StockLocationSerializer < BaseSerializer
-          include ::Spree::Api::V2::ResourceSerializerConcern
+          include ResourceSerializerConcern
 
           attributes :name
-
-          has_many :shipments
-          has_many :stock_items
+          belongs_to :country
         end
       end
     end

@@ -1,14 +1,14 @@
 require 'spec_helper'
 
 describe Spree::Api::V2::Platform::OptionTypeSerializer do
-  subject { described_class.new(option_type) }
+  subject { described_class.new(option_type).serializable_hash }
 
   let(:option_type) { create(:option_type, option_values: create_list(:option_value, 2)) }
 
-  it { expect(subject.serializable_hash).to be_kind_of(Hash) }
+  it { expect(subject).to be_kind_of(Hash) }
 
   it do
-    expect(subject.serializable_hash).to eq(
+    expect(subject).to eq(
       {
         data: {
           id: option_type.id.to_s,
@@ -19,7 +19,9 @@ describe Spree::Api::V2::Platform::OptionTypeSerializer do
             position: option_type.position,
             created_at: option_type.created_at,
             updated_at: option_type.updated_at,
-            filterable: option_type.filterable
+            filterable: option_type.filterable,
+            public_metadata: {},
+            private_metadata: {}
           },
           relationships: {
             option_values: {
@@ -39,4 +41,6 @@ describe Spree::Api::V2::Platform::OptionTypeSerializer do
       }
     )
   end
+
+  it_behaves_like 'an ActiveJob serializable hash'
 end

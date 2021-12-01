@@ -26,7 +26,7 @@ module Spree
     after_destroy { variant.touch }
 
     self.whitelisted_ransackable_attributes = %w[count_on_hand stock_location_id variant_id]
-    self.whitelisted_ransackable_associations = ['variant']
+    self.whitelisted_ransackable_associations = %w[variant stock_location]
 
     scope :with_active_stock_location, -> { joins(:stock_location).merge(Spree::StockLocation.active) }
 
@@ -79,7 +79,7 @@ module Spree
 
         if unit.quantity > number
           # if required quantity is greater than available
-          # split off and fullfill that
+          # split off and fulfill that
           split = unit.split_inventory!(number)
           split.fill_backorder
         else

@@ -64,9 +64,9 @@ module Spree
           render json: json, status: status, content_type: content_type
         end
 
-        def render_result(result)
+        def render_result(result, ok_status = 200)
           if result.success?
-            render_serialized_payload { serialize_resource(result.value) }
+            render_serialized_payload(ok_status) { serialize_resource(result.value) }
           else
             render_error_payload(result.error)
           end
@@ -78,7 +78,7 @@ module Spree
 
           doorkeeper_authorize!
 
-          @spree_current_user ||= Spree.user_class.find_by(id: doorkeeper_token.resource_owner_id)
+          @spree_current_user ||= doorkeeper_token.resource_owner
         end
 
         def spree_authorize!(action, subject, *args)
@@ -89,13 +89,13 @@ module Spree
           raise CanCan::AccessDenied if spree_current_user.nil?
         end
 
-        # Needs to be overriden so that we use Spree's Ability rather than anyone else's.
+        # Needs to be overridden so that we use Spree's Ability rather than anyone else's.
         def current_ability
           @current_ability ||= Spree::Dependencies.ability_class.constantize.new(spree_current_user)
         end
 
         def request_includes
-          # if API user want's to receive only the bare-minimum
+          # if API user wants to receive only the bare-minimum
           # the API will return only the main resource without any included
           if params[:include]&.blank?
             []
@@ -131,6 +131,7 @@ module Spree
           {
             currency: current_currency,
             locale: current_locale,
+            price_options: current_price_options,
             store: current_store,
             user: spree_current_user,
             image_transformation: params[:image_transformation],

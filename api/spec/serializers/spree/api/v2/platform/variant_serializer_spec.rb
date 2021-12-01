@@ -1,16 +1,17 @@
 require 'spec_helper'
 
 describe Spree::Api::V2::Platform::VariantSerializer do
+  subject { described_class.new(variant, params: serializer_params).serializable_hash }
+
   include_context 'API v2 serializers params'
 
-  subject { described_class.new(variant, params: serializer_params) }
-
   let!(:variant) { create(:variant, price: 10, compare_at_price: 15, images: create_list(:image, 2), tax_category: create(:tax_category)) }
+  let!(:digital) { create(:digital, variant: variant) }
 
-  it { expect(subject.serializable_hash).to be_kind_of(Hash) }
+  it { expect(subject).to be_kind_of(Hash) }
 
   it do
-    expect(subject.serializable_hash).to eq(
+    expect(subject).to eq(
       {
         data: {
           id: variant.id.to_s,
@@ -40,7 +41,9 @@ describe Spree::Api::V2::Platform::VariantSerializer do
             price: BigDecimal(10),
             display_price: '$10.00',
             compare_at_price: BigDecimal(15),
-            display_compare_at_price: '$15.00'
+            display_compare_at_price: '$15.00',
+            public_metadata: {},
+            private_metadata: {}
           },
           relationships: {
             product: {
@@ -60,6 +63,14 @@ describe Spree::Api::V2::Platform::VariantSerializer do
                 {
                   id: variant.option_values.first.id.to_s,
                   type: :option_value
+                }
+              ]
+            },
+            digitals: {
+              data: [
+                {
+                  id: variant.digitals.first.id.to_s,
+                  type: :digital
                 }
               ]
             },
@@ -96,4 +107,6 @@ describe Spree::Api::V2::Platform::VariantSerializer do
       }
     )
   end
+
+  it_behaves_like 'an ActiveJob serializable hash'
 end

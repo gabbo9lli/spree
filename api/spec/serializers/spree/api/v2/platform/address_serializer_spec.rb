@@ -1,14 +1,12 @@
 require 'spec_helper'
 
 describe Spree::Api::V2::Platform::AddressSerializer do
-  subject { described_class.new(address) }
+  subject { described_class.new(address).serializable_hash }
 
   let(:address) { create(:address, user: create(:user)) }
 
-  it { expect(subject.serializable_hash).to be_kind_of(Hash) }
-
   it do
-    expect(subject.serializable_hash).to eq(
+    expect(subject).to eq(
       {
         data: {
           id: address.id.to_s,
@@ -28,6 +26,8 @@ describe Spree::Api::V2::Platform::AddressSerializer do
             updated_at: address.updated_at,
             deleted_at: address.deleted_at,
             label: address.label,
+            public_metadata: {},
+            private_metadata: {}
           },
           relationships: {
             country: {
@@ -53,4 +53,6 @@ describe Spree::Api::V2::Platform::AddressSerializer do
       }
     )
   end
+
+  it_behaves_like 'an ActiveJob serializable hash'
 end

@@ -3,8 +3,8 @@ module Spree
     module V2
       module Platform
         class ProductSerializer < BaseSerializer
-          include ::Spree::Api::V2::ResourceSerializerConcern
-          include ::Spree::Api::V2::DisplayMoneyHelper
+          include ResourceSerializerConcern
+          include DisplayMoneyHelper
 
           attribute :purchasable do |product|
             product.purchasable?
@@ -60,7 +60,11 @@ module Spree
           has_many :option_types
           has_many :product_properties
           has_many :taxons, serializer: :taxon, record_type: :taxon do |object, params|
-            object.taxons_for_store(params[:store])
+            if params[:store].present?
+              object.taxons_for_store(params[:store])
+            else
+              object.taxons
+            end
           end
 
           has_many :images,

@@ -1,5 +1,7 @@
 module Spree
   class Taxonomy < Spree::Base
+    include Metadata
+
     acts_as_list
 
     validates :name, presence: true, uniqueness: { case_sensitive: false, allow_blank: true, scope: :store_id }
@@ -14,6 +16,8 @@ module Spree
 
     default_scope { order("#{table_name}.position, #{table_name}.created_at") }
 
+    self.whitelisted_ransackable_associations = %w[root]
+
     private
 
     def set_root
@@ -21,6 +25,9 @@ module Spree
     end
 
     def set_root_taxon_name
+      return unless saved_change_to_name?
+      return if name.to_s == root.name.to_s
+
       root.update(name: name)
     end
   end

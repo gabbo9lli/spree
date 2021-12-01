@@ -1,5 +1,14 @@
 module Spree
   class Store < Spree::Base
+    typed_store :settings, coder: ActiveRecord::TypedStore::IdentityCoder do |s|
+      # Spree Digital Asset Configurations
+      s.boolean :limit_digital_download_count, default: true, null: false
+      s.boolean :limit_digital_download_days, default: true, null: false
+      s.integer :digital_asset_authorized_clicks, default: 5, null: false # number of times a customer can download a digital file.
+      s.integer :digital_asset_authorized_days, default: 7, null: false # number of days after initial purchase the customer can download a file.
+      s.integer :digital_asset_link_expire_time, default: 300, null: false # 5 minutes in seconds
+    end
+
     MAILER_LOGO_CONTENT_TYPES = ['image/png', 'image/jpg', 'image/jpeg'].freeze
     FAVICON_CONTENT_TYPES = ['image/png', 'image/x-icon', 'image/vnd.microsoft.icon'].freeze
 
@@ -38,6 +47,8 @@ module Spree
     has_many :store_promotions, class_name: 'Spree::StorePromotion'
     has_many :promotions, through: :store_promotions, class_name: 'Spree::Promotion'
 
+    has_many :wishlists, class_name: 'Spree::Wishlist'
+
     belongs_to :default_country, class_name: 'Spree::Country'
     belongs_to :checkout_zone, class_name: 'Spree::Zone'
 
@@ -45,8 +56,11 @@ module Spree
       validates :name, :url, :mail_from_address, :default_currency, :code
     end
 
-    validates :code, uniqueness: true
+    validates :digital_asset_authorized_clicks, numericality: { only_integer: true, greater_than: 0 }
+    validates :digital_asset_authorized_days, numericality: { only_integer: true, greater_than: 0 }
+    validates :code, uniqueness: { conditions: -> { with_deleted } }
 
+    # FIXME: we should remove this condition in v5
     if !ENV['SPREE_DISABLE_DB_CONNECTION'] &&
         connected? &&
         table_exists? &&
@@ -68,7 +82,8 @@ module Spree
 
     before_save :ensure_default_exists_and_is_unique
     before_save :ensure_supported_currencies, :ensure_supported_locales, :ensure_default_country
-    before_destroy :validate_not_default
+    before_destroy :validate_not_last
+    before_destroy :pass_default_flag_to_other_store
 
     scope :by_url, ->(url) { where('url like ?', "%#{url}%") }
 
@@ -84,6 +99,8 @@ module Spree
       Stores::FindCurrent.new(url: url).execute
     end
 
+    # FIXME: we need to drop `or_initialize` in v5
+    # this behaviour is very buggy and unpredictable
     def self.default
       Rails.cache.fetch('default_store') do
         where(default: true).first_or_initialize
@@ -144,14 +161,16 @@ module Spree
     end
 
     def countries_available_for_checkout
-      @countries_available_for_checkout ||= checkout_zone_or_default.try(:country_list) || Spree::Country.all
+      @countries_available_for_checkout ||= checkout_zone.try(:country_list) || Spree::Country.all
     end
 
     def states_available_for_checkout(country)
-      checkout_zone_or_default.try(:state_list_for, country) || country.states
+      checkout_zone.try(:state_list_for, country) || country.states
     end
 
     def checkout_zone_or_default
+      ActiveSupport::Deprecation.warn('Store#checkout_zone_or_default is deprecated and will be removed in Spree 5')
+
       @checkout_zone_or_default ||= checkout_zone || Spree::Zone.default_checkout_zone
     end
 
@@ -159,6 +178,10 @@ module Spree
       return unless favicon_image.attached?
 
       favicon_image.variant(resize: '32x32')
+    end
+
+    def can_be_deleted?
+      self.class.where.not(id: id).any?
     end
 
     private
@@ -187,10 +210,17 @@ module Spree
       self.supported_currencies = default_currency
     end
 
-    def validate_not_default
-      if default
-        errors.add(:base, :cannot_destroy_default_store)
+    def validate_not_last
+      unless can_be_deleted?
+        errors.add(:base, :cannot_destroy_only_store)
         throw(:abort)
+      end
+    end
+
+    def pass_default_flag_to_other_store
+      if default? && can_be_deleted?
+        self.class.where.not(id: id).first.update!(default: true)
+        self.default = false
       end
     end
 

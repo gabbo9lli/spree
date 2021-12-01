@@ -24,6 +24,7 @@ module Spree
     include ProductScopes
     include MultiStoreResource
     include MemoizedData
+    include Metadata
 
     MEMOIZED_METHODS = %w(total_on_hand taxonomy_ids taxon_and_ancestors category
                           default_variant_id tax_category default_variant
@@ -87,6 +88,7 @@ module Spree
 
     has_many :store_products, class_name: 'Spree::StoreProduct'
     has_many :stores, through: :store_products, class_name: 'Spree::Store'
+    has_many :digitals, through: :variants_including_master
 
     after_create :add_associations_from_prototype
     after_create :build_variants_from_option_values_hash, if: :option_values_hash
@@ -115,8 +117,10 @@ module Spree
       validates :price, if: :requires_price?
     end
 
-    validates :slug, presence: true, uniqueness: { allow_blank: true, case_sensitive: true }
+    validates :slug, presence: true, uniqueness: { allow_blank: true, case_sensitive: true, scope: spree_base_uniqueness_scope }
     validate :discontinue_on_must_be_later_than_available_on, if: -> { available_on && discontinue_on }
+
+    scope :for_store, ->(store) { joins(:store_products).where(StoreProduct.table_name => { store_id: store.id }) }
 
     attr_accessor :option_values_hash
 
@@ -126,7 +130,7 @@ module Spree
 
     self.whitelisted_ransackable_associations = %w[taxons stores variants_including_master master variants]
     self.whitelisted_ransackable_attributes = %w[description name slug discontinue_on]
-    self.whitelisted_ransackable_scopes = %w[not_discontinued search_by_name]
+    self.whitelisted_ransackable_scopes = %w[not_discontinued search_by_name in_taxon price_between]
 
     [
       :sku, :price, :currency, :weight, :height, :width, :depth, :is_master,
@@ -140,17 +144,17 @@ module Spree
 
     alias master_images images
 
-    # Cant use short form block syntax due to https://github.com/Netflix/fast_jsonapi/issues/259
+    # Can't use short form block syntax due to https://github.com/Netflix/fast_jsonapi/issues/259
     def purchasable?
       default_variant.purchasable? || variants.any?(&:purchasable?)
     end
 
-    # Cant use short form block syntax due to https://github.com/Netflix/fast_jsonapi/issues/259
+    # Can't use short form block syntax due to https://github.com/Netflix/fast_jsonapi/issues/259
     def in_stock?
       default_variant.in_stock? || variants.any?(&:in_stock?)
     end
 
-    # Cant use short form block syntax due to https://github.com/Netflix/fast_jsonapi/issues/259
+    # Can't use short form block syntax due to https://github.com/Netflix/fast_jsonapi/issues/259
     def backorderable?
       default_variant.backorderable? || variants.any?(&:backorderable?)
     end
@@ -193,10 +197,7 @@ module Spree
     end
 
     # Adding properties and option types on creation based on a chosen prototype
-    attr_reader :prototype_id
-    def prototype_id=(value)
-      @prototype_id = value.to_i
-    end
+    attr_accessor :prototype_id
 
     # Ensures option_types and product_option_types exist for keys in option_values_hash
     def ensure_option_types_exist_for_values_hash
@@ -263,14 +264,6 @@ module Spree
       where conditions.inject(:or)
     end
 
-    def self.search_by_name(query)
-      if defined?(SpreeGlobalize)
-        joins(:translations).order(:name).where("LOWER(#{Product::Translation.table_name}.name) LIKE LOWER(:query)", query: "%#{query}%").distinct
-      else
-        where("LOWER(#{Product.table_name}.name) LIKE LOWER(:query)", query: "%#{query}%")
-      end
-    end
-
     # Suitable for displaying only variants that has at least one option value.
     # There may be scenarios where an option type is removed and along with it
     # all option values. At that point all variants associated with only those
@@ -328,6 +321,14 @@ module Spree
     def taxons_for_store(store)
       Rails.cache.fetch("#{cache_key_with_version}/taxons-per-store/#{store.id}") do
         taxons.for_store(store)
+      end
+    end
+
+    def any_variant_in_stock_or_backorderable?
+      if variants.any?
+        variants_including_master.in_stock_or_backorderable.exists?
+      else 
+        master.in_stock_or_backorderable?
       end
     end
 

@@ -93,6 +93,14 @@ describe Spree::Order, type: :model do
         end
       end
 
+      context 'when delivery not required' do
+        before { allow(order).to receive_messages delivery_required?: false }
+
+        specify do
+          expect(order.checkout_steps).to eq(%w(address complete))
+        end
+      end
+
       context 'when payment not required' do
         before { allow(order).to receive_messages payment_required?: false }
 
@@ -132,7 +140,8 @@ describe Spree::Order, type: :model do
         end
 
         it "doesn't raise an error if the default address is invalid" do
-          order.user = mock_model(Spree::LegacyUser, ship_address: Spree::Address.new, bill_address: Spree::Address.new)
+          order.user = build(:user, ship_address: build(:address), bill_address: build(:address))
+
           expect { order.next! }.not_to raise_error
         end
 
@@ -443,6 +452,8 @@ describe Spree::Order, type: :model do
     end
 
     context 'default credit card' do
+      let(:digital) { create(:digital) }
+
       before do
         order.user = FactoryBot.create(:user)
         order.email = 'spree@example.org'
@@ -450,7 +461,7 @@ describe Spree::Order, type: :model do
 
         # make sure we will actually capture a payment
         allow(order).to receive_messages(payment_required?: true)
-        order.line_items << FactoryBot.create(:line_item)
+        order.line_items << FactoryBot.create(:line_item, variant: digital.variant)
         Spree::OrderUpdater.new(order).update
 
         order.save!
@@ -460,6 +471,12 @@ describe Spree::Order, type: :model do
         order.next!
         expect(order.state).to eq 'complete'
         expect(order.user.reload.default_credit_card.try(:id)).to eq(order.credit_cards.first.id)
+      end
+
+      it 'creates a digital_link for the digital line_item' do
+        order.next!
+        expect(order.state).to eq 'complete'
+        expect(order.line_items.first.digital_links).not_to be_empty
       end
 
       it 'does not assign a default credit card if temporary_credit_card is set' do
@@ -625,7 +642,7 @@ describe Spree::Order, type: :model do
     let(:permitted_params) { {} }
     let(:params) { {} }
 
-    it 'calls update_atributes without order params' do
+    it 'calls update_attributes without order params' do
       expect(order).to receive(:update).with({})
       order.update_from_params(params, permitted_params)
     end

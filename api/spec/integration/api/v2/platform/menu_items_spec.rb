@@ -4,8 +4,10 @@ describe 'Menu Items API', swagger: true do
   include_context 'Platform API v2'
 
   resource_name = 'Menu Item'
-  include_example = 'linked_resource'
-  filter_example = 'menu_item_name_eq=Women'
+  options = {
+    include_example: 'menu,icon,parent,children,linked_resource',
+    filter_examples: [{ name: 'filter[name_eq]', example: 'T-Shirts' }]
+  }
 
   let(:menu) { create(:menu, store: store) }
   let(:id) { create(:menu_item, menu: menu).id }
@@ -17,22 +19,28 @@ describe 'Menu Items API', swagger: true do
   let(:valid_create_param_value) { build(:menu_item, menu: menu).attributes }
   let(:valid_update_param_value) do
     {
-      name: 'Menu Item One'
+      menu_item: {
+        name: 'Menu Item One'
+      }
     }
   end
   let(:invalid_param_value) do
     {
-      name: '',
+      menu_item: {
+        name: ''
+      }
     }
   end
   let(:valid_update_position_param_value) do
     {
-      new_parent_id: menu_item_two.id,
-      new_position_idx: 0
+      menu_item: {
+        new_parent_id: menu_item_two.id,
+        new_position_idx: 0
+      }
     }
   end
 
-  include_examples 'CRUD examples', resource_name, include_example, filter_example
+  include_examples 'CRUD examples', resource_name, options
 
   path '/api/v2/platform/menu_items/{id}/reposition' do
     patch 'Reposition a Menu Item' do
@@ -42,15 +50,9 @@ describe 'Menu Items API', swagger: true do
       description 'Reposition a Menu Item'
       consumes 'application/json'
       parameter name: :id, in: :path, type: :string
-      parameter name: :menu_item, in: :body, schema: { '$ref' => '#/components/schemas/menu_item_reposition_params' }
+      parameter name: :menu_item, in: :body, schema: { '$ref' => '#/components/schemas/menu_item_reposition' }
 
       let(:menu_item) { valid_update_position_param_value }
-      let(:invalid_param_value) do
-        {
-          new_parent_id: 'invalid',
-          new_position_idx: 'invalid'
-        }
-      end
 
       it_behaves_like 'record updated'
       it_behaves_like 'record not found', :menu_item

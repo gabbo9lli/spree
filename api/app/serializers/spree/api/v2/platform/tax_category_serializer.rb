@@ -3,9 +3,9 @@ module Spree
     module V2
       module Platform
         class TaxCategorySerializer < BaseSerializer
-          include ::Spree::Api::V2::ResourceSerializerConcern
+          include ResourceSerializerConcern
 
-          # TODO: add tax_rates
+          has_many :tax_rates
         end
       end
     end

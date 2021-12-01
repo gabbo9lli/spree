@@ -14,7 +14,7 @@ prepare_app(){
   echo "Preparing test app..."
   bundle exec rake test_app
 }
-# Target postgres. Override with: `DB=sqlite bash bin/build.sh`
+# Target postgres. Override with: `DB=mysql bash bin/build.sh`
 export DB=${DB:-postgres}
 
 # Spree defaults
@@ -25,25 +25,13 @@ bundle check || bundle update --quiet
 echo "**************************************"
 echo "* Setup Spree API and running RSpec..."
 echo "**************************************"
-cd api; prepare_app; bundle exec rspec spec
-
-# Spree Backend
-echo "******************************************"
-echo "* Setup Spree Backend and running RSpec..."
-echo "******************************************"
-cd ../backend; prepare_app; bundle exec rspec spec
+cd ../api; prepare_app; bundle exec rspec spec
 
 # Spree Core
 echo "***************************************"
 echo "* Setup Spree Core and running RSpec..."
 echo "***************************************"
 cd ../core; prepare_app; bundle exec rspec spec
-
-# Spree Frontend
-echo "*******************************************"
-echo "* Setup Spree Frontend and running RSpec..."
-echo "*******************************************"
-cd ../frontend; prepare_app; bundle exec rspec spec
 
 # Spree Emails
 echo "*******************************************"
@@ -52,8 +40,8 @@ echo "*******************************************"
 cd ../emails; prepare_app; bundle exec rspec spec
 
 # Spree Sample
-echo "*****************************************"
+echo "*******************************************"
 echo "* Setup Spree Sample and running RSpec..."
-echo "*****************************************"
+echo "*******************************************"
 cd ../sample; prepare_app; bundle exec rspec spec
 

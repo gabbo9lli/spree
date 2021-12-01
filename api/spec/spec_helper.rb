@@ -27,6 +27,8 @@ end
 
 require 'rspec/rails'
 require 'ffaker'
+require 'webmock/rspec'
+require 'i18n/tasks'
 
 # Requires supporting ruby files with custom matchers and macros, etc,
 # in spec/support/ and its subdirectories.
@@ -39,12 +41,17 @@ require 'spree/testing_support/next_instance_of'
 require 'spree/testing_support/rspec_retry_config'
 
 require 'spree/api/testing_support/caching'
+require 'spree/api/testing_support/jobs'
 require 'spree/api/testing_support/helpers'
+require 'spree/api/testing_support/serializers'
 require 'spree/api/testing_support/setup'
+require 'spree/api/testing_support/spree_webhooks'
+require 'spree/api/testing_support/matchers/webhooks'
 require 'spree/api/testing_support/v2/base'
 require 'spree/api/testing_support/v2/current_order'
 require 'spree/api/testing_support/v2/platform_contexts'
 require 'spree/api/testing_support/v2/serializers_params'
+require 'spree/api/testing_support/factories'
 
 RSpec.configure do |config|
   config.backtrace_exclusion_patterns = [/gems\/activesupport/, /gems\/actionpack/, /gems\/rspec/]
@@ -64,14 +71,15 @@ RSpec.configure do |config|
   config.include Spree::TestingSupport::ImageHelpers
 
   config.before do
+    ENV['DISABLE_SPREE_WEBHOOKS'] = 'true'
+
+    Rails.cache.clear
     reset_spree_preferences
 
     Spree::Api::Config[:requires_authentication] = true
 
-    country = create(:country, name: 'United States of America', iso_name: 'UNITED STATES', iso: 'US', states_required: true)
-    Spree::Config[:default_country_id] = country.id
-
-    create(:store, default: true)
+    country = create(:country, name: 'United States of America', iso_name: 'UNITED STATES', iso: 'US', iso3: 'USA', states_required: true)
+    create(:store, default: true, default_country: country, default_currency: 'USD')
   end
 
   config.order = :random

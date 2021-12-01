@@ -2,9 +2,13 @@ module Spree
   module PermittedAttributes
     ATTRIBUTES = [
       :address_attributes,
-      :classification_attributes,
       :checkout_attributes,
+      :classification_attributes,
+      :cms_page_attributes,
+      :cms_section_attributes,
       :customer_return_attributes,
+      :digital_attributes,
+      :digital_link_attributes,
       :image_attributes,
       :inventory_unit_attributes,
       :line_item_attributes,
@@ -28,19 +32,19 @@ module Spree
       :taxonomy_attributes,
       :user_attributes,
       :variant_attributes,
-      :cms_page_attributes,
-      :cms_section_attributes
+      :wishlist_attributes,
+      :wished_item_attributes
     ]
 
-    mattr_reader *ATTRIBUTES
+    mattr_reader(*ATTRIBUTES)
 
     @@address_attributes = [
       :id, :firstname, :lastname, :first_name, :last_name,
       :address1, :address2, :city, :country_iso, :country_id, :state_id,
       :zipcode, :phone, :state_name, :alternative_phone, :company,
       :user_id, :deleted_at, :label,
-      country: [:iso, :name, :iso3, :iso_name],
-      state: [:name, :abbr]
+      { country: [:iso, :name, :iso3, :iso_name],
+        state: [:name, :abbr] }
     ]
 
     @@checkout_attributes = [
@@ -54,9 +58,16 @@ module Spree
 
     @@cms_page_attributes = [:title, :meta_title, :content, :meta_description, :visible, :slug, :locale]
 
-    @@cms_section_attributes = [:name, :content, :settings, :fit, :destination]
+    @@cms_section_attributes = [:name, :cms_page_id, :fit, :destination, { content: {}, settings: {} }]
 
-    @@customer_return_attributes = [:stock_location_id, return_items_attributes: [:id, :inventory_unit_id, :return_authorization_id, :returned, :pre_tax_amount, :acceptance_status, :exchange_variant_id, :resellable]]
+    @@customer_return_attributes = [:stock_location_id, {
+      return_items_attributes: [:id, :inventory_unit_id, :return_authorization_id, :returned, :pre_tax_amount,
+                                :acceptance_status, :exchange_variant_id, :resellable]
+    }]
+
+    @@digital_attributes = [:attachment, :variant_id]
+
+    @@digital_link_attributes = [:access_counter]
 
     @@image_attributes = [:alt, :attachment, :position, :viewable_type, :viewable_id]
 
@@ -83,12 +94,13 @@ module Spree
       :option_values_hash, :weight, :height, :width, :depth,
       :shipping_category_id, :tax_category_id,
       :cost_currency, :cost_price, :compare_at_price,
-      option_type_ids: [], taxon_ids: []
+      { option_type_ids: [], taxon_ids: [] }
     ]
 
     @@property_attributes = [:name, :presentation]
 
-    @@return_authorization_attributes = [:amount, :memo, :stock_location_id, :inventory_units_attributes, :return_authorization_reason_id]
+    @@return_authorization_attributes = [:amount, :memo, :stock_location_id, :inventory_units_attributes,
+                                         :return_authorization_reason_id]
 
     @@shipment_attributes = [
       :order, :special_instructions, :stock_location_id, :id,
@@ -119,7 +131,9 @@ module Spree
                           :customer_support_email, :facebook, :twitter, :instagram,
                           :description, :address, :contact_phone, :supported_locales,
                           :default_locale, :default_country_id, :supported_currencies,
-                          :new_order_notifications_email, :mailer_logo, :favicon_image, :checkout_zone_id, :seo_robots]
+                          :new_order_notifications_email, :mailer_logo, :favicon_image,
+                          :checkout_zone_id, :seo_robots, :digital_asset_authorized_clicks,
+                          :digital_asset_authorized_days, :limit_digital_download_count, :limit_digital_download_days]
 
     @@store_credit_attributes = %i[amount currency category_id memo]
 
@@ -131,14 +145,18 @@ module Spree
     ]
 
     # TODO: Should probably use something like Spree.user_class.attributes
-    @@user_attributes = [:email, :bill_address_id, :ship_address_id, :password, :password_confirmation]
+    @@user_attributes = [:email, :bill_address_id, :ship_address_id, :password, :password_confirmation, { public_metadata: {}, private_metadata: {} }]
 
     @@variant_attributes = [
       :name, :presentation, :cost_price, :discontinue_on, :lock_version,
       :position, :track_inventory,
       :product_id, :product, :option_values_attributes, :price, :compare_at_price,
       :weight, :height, :width, :depth, :sku, :cost_currency,
-      options: [:name, :value], option_value_ids: []
+      { options: [:name, :value], option_value_ids: [] }
     ]
+
+    @@wishlist_attributes = [:name, :is_default, :is_private]
+
+    @@wished_item_attributes = [:variant_id, :quantity]
   end
 end

@@ -18,13 +18,14 @@ require 'mini_magick'
 require 'ransack'
 require 'state_machines-activerecord'
 require 'active_storage_validations'
+require 'activerecord-typedstore'
 
 # This is required because ActiveModel::Validations#invalid? conflicts with the
 # invalid state of a Payment. In the future this should be removed.
 StateMachines::Machine.ignore_method_conflicts = true
 
 module Spree
-  mattr_accessor :user_class
+  mattr_accessor :user_class, :admin_user_class, :private_storage_service_name
 
   def self.user_class(constantize: true)
     if @@user_class.is_a?(Class)
@@ -34,19 +35,24 @@ module Spree
     end
   end
 
-  def self.admin_path
-    Spree::Config[:admin_path]
+  def self.admin_user_class(constantize: true)
+    @@admin_user_class ||= @@user_class
+
+    if @@admin_user_class.is_a?(Class)
+      raise 'Spree.admin_user_class MUST be a String or Symbol object, not a Class object.'
+    elsif @@admin_user_class.is_a?(String) || @@admin_user_class.is_a?(Symbol)
+      constantize ? @@admin_user_class.to_s.constantize : @@admin_user_class.to_s
+    end
   end
 
-  # Used to configure admin_path for Spree
-  #
-  # Example:
-  #
-  # write the following line in `config/initializers/spree.rb`
-  #   Spree.admin_path = '/custom-path'
-
-  def self.admin_path=(path)
-    Spree::Config[:admin_path] = path
+  def self.private_storage_service_name
+    if @@private_storage_service_name
+      if @@private_storage_service_name.is_a?(String) || @@private_storage_service_name.is_a?(Symbol)
+        @@private_storage_service_name.to_sym
+      else
+        raise 'Spree.private_storage_service_name MUST be a String or Symbol object.'
+      end
+    end
   end
 
   # Used to configure Spree.
@@ -97,8 +103,10 @@ require 'spree/localized_number'
 require 'spree/money'
 require 'spree/permitted_attributes'
 require 'spree/service_module'
-require 'spree/dependencies_helper'
 require 'spree/database_type_utilities'
+
+require 'spree/core/dependencies_helper'
+require 'spree/core/app_dependencies'
 
 require 'spree/core/importer'
 require 'spree/core/query_filters'

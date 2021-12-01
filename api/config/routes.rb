@@ -145,10 +145,12 @@ Spree::Core::Engine.add_routes do
           patch :next
           patch :advance
           patch :complete
+          post :create_payment
           post :add_store_credit
           post :remove_store_credit
           get :payment_methods
           get :shipping_rates
+          patch :select_shipping_method
         end
 
         resource :account, controller: :account, only: %i[show create update]
@@ -168,32 +170,47 @@ Spree::Core::Engine.add_routes do
 
         resources :menus, only: %i[index show]
         resources :cms_pages, only: %i[index show]
+
+        resources :wishlists do
+          get :default, on: :collection
+
+          member do
+            post :add_item
+            patch 'set_item_quantity/:item_id', to: 'wishlists#set_item_quantity', as: :set_item_quantity
+            delete 'remove_item/:item_id', to: 'wishlists#remove_item', as: :remove_item
+          end
+        end
+
+        get '/digitals/:token', to: 'digitals#download', as: 'digital'
       end
 
       namespace :platform do
         # Promotions API
         resources :promotions
+        resources :promotion_actions
+        resources :promotion_categories
+        resources :promotion_rules
 
         # Returns API
         resources :customer_returns
         resources :reimbursements
         resources :return_authorizations do
           member do
-            put :add
-            put :cancel
-            put :receive
+            patch :add
+            patch :cancel
+            patch :receive
           end
         end
 
         # Product Catalog API
         resources :products
         resources :taxonomies
-        resources :taxons
-        resources :classifications do
+        resources :taxons do
           member do
-            put :reposition
+            patch :reposition
           end
         end
+        resources :classifications
         resources :images
         resources :variants
         resources :properties
@@ -204,25 +221,37 @@ Spree::Core::Engine.add_routes do
         # Order API
         resources :orders do
           member do
-            put :next
-            put :advance
-            put :approve
-            put :cancel
-            put :empty
-            put :apply_coupon_code
-            put :remove_coupon_code
+            patch :next
+            patch :advance
+            patch :approve
+            patch :cancel
+            patch :empty
+            patch :apply_coupon_code
+            patch :complete
+            patch :use_store_credit
+            patch :cancel
+            patch :approve
           end
         end
         resources :line_items
+        resources :adjustments
+
+        # Payments API
         resources :payments do
-          member do
-            put :authorize
-            put :capture
-            put :purchase
-            put :void
-            put :credit
-          end
+          # TODO: support custom actions
+          # member do
+          #   patch :authorize
+          #   patch :capture
+          #   patch :purchase
+          #   patch :void
+          #   patch :credit
+          # end
         end
+
+        # Store Credit API
+        resources :store_credits
+        resources :store_credit_categories
+        resources :store_credit_types
 
         # Geo API
         resources :zones
@@ -231,17 +260,20 @@ Spree::Core::Engine.add_routes do
 
         # Shipment API
         resources :shipments do
-          collection do
-            post 'transfer_to_location'
-            post 'transfer_to_shipment'
-          end
           member do
-            put :ready
-            put :ship
-            put :add
-            put :remove
+            %w[ready ship cancel resume pend].each do |state|
+              patch state.to_sym
+            end
+            patch :add_item
+            patch :remove_item
+            patch :transfer_to_location
+            patch :transfer_to_shipment
           end
         end
+
+        # Tax API
+        resources :tax_rates
+        resources :tax_categories
 
         # Inventory API
         resources :inventory_units
@@ -254,6 +286,8 @@ Spree::Core::Engine.add_routes do
         resources :credit_cards
         resources :addresses
 
+        resources :roles
+
         # Menu API
         resources :menus
         resources :menu_items do
@@ -262,46 +296,36 @@ Spree::Core::Engine.add_routes do
           end
         end
 
-        # CMS Pages API
-        resources :cms_pages do
-          member do
-            patch :toggle_visibility
-          end
-        end
+        # CMS
+        resources :cms_pages
+        resources :cms_sections
 
-        resource :cms_sections do
+        # Wishlists API
+        resources :wishlists
+        resources :wished_items
+
+        # Digitals API
+        resources :digitals
+        resources :digital_links do
           member do
-            patch :reposition
+            patch :reset
           end
         end
 
         # Store API
         resources :stores
+
+        # Configurations API
+        resources :payment_methods
+        resources :shipping_categories
+        resources :shipping_methods
+
+        # Webhooks API
+        namespace :webhooks do
+          resources :events, only: :index
+          resources :subscribers
+        end
       end
     end
-
-    get '/404', to: 'errors#render_404'
-
-    match 'v:api/*path', to: redirect { |params, request|
-      format = ".#{params[:format]}" unless params[:format].blank?
-      query  = "?#{request.query_string}" unless request.query_string.blank?
-
-      if request.path == "#{spree_path}api/v1/#{params[:path]}#{format}#{query}"
-        "#{spree_path}api/404"
-      else
-        "#{spree_path}api/v1/#{params[:path]}#{format}#{query}"
-      end
-    }, via: [:get, :post, :put, :patch, :delete]
-
-    match '*path', to: redirect { |params, request|
-      format = ".#{params[:format]}" unless params[:format].blank?
-      query  = "?#{request.query_string}" unless request.query_string.blank?
-
-      if request.path == "#{spree_path}api/v1/#{params[:path]}#{format}#{query}"
-        "#{spree_path}api/404"
-      else
-        "#{spree_path}api/v1/#{params[:path]}#{format}#{query}"
-      end
-    }, via: [:get, :post, :put, :patch, :delete]
   end
 end

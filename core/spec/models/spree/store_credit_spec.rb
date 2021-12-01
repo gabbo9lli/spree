@@ -1,9 +1,11 @@
 require 'spec_helper'
 
-describe 'StoreCredit' do
+describe Spree::StoreCredit, type: :model do
   let(:currency) { 'TEST' }
   let(:store_credit) { build(:store_credit, store_credit_attrs) }
   let(:store_credit_attrs) { {} }
+
+  it_behaves_like 'metadata'
 
   describe 'callbacks' do
     subject { store_credit.save }
@@ -508,7 +510,7 @@ describe 'StoreCredit' do
             @new_store_credit = Spree::StoreCredit.last
           end
 
-          it 'does not set the amount used on hte originating store credit' do
+          it 'does not set the amount used on the originating store credit' do
             expect(store_credit.reload.amount_used).to eq amount_used
           end
 
@@ -739,7 +741,7 @@ describe 'StoreCredit' do
     end
 
     describe '#store_events' do
-      let(:store) { create(:store) }
+      let(:store) { Spree::Store.default }
 
       context 'create' do
         context 'user has one store credit' do

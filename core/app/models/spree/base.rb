@@ -36,6 +36,10 @@ class Spree::Base < ApplicationRecord
     where(nil)
   end
 
+  def self.spree_base_uniqueness_scope
+    ApplicationRecord.try(:spree_base_uniqueness_scope) || []
+  end
+
   # FIXME: https://github.com/rails/rails/issues/40943
   def self.has_many_inversing
     false
@@ -43,6 +47,16 @@ class Spree::Base < ApplicationRecord
 
   def self.json_api_columns
     column_names.reject { |c| c.match(/_id$|id|preferences|(.*)password|(.*)token|(.*)api_key/) }
+  end
+
+  def self.json_api_permitted_attributes
+    skipped_attributes = %w[id]
+
+    if included_modules.include?(CollectiveIdea::Acts::NestedSet::Model)
+      skipped_attributes.push('lft', 'rgt', 'depth')
+    end
+
+    column_names.reject { |c| skipped_attributes.include?(c.to_s) }
   end
 
   def self.json_api_type

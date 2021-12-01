@@ -3,7 +3,11 @@ module Spree
     module V2
       module Storefront
         class CartController < ::Spree::Api::V2::BaseController
-          include Spree::Api::V2::Storefront::OrderConcern
+          include OrderConcern
+          include CouponCodesHelper
+          include Spree::Api::V2::Storefront::MetadataControllerConcern
+
+          before_action :ensure_valid_metadata, only: %i[create add_item]
           before_action :ensure_order, except: %i[create associate]
           before_action :load_variant, only: :add_item
           before_action :require_spree_current_user, only: :associate
@@ -12,14 +16,16 @@ module Spree
           def create
             spree_authorize! :create, Spree::Order
 
-            order_params = {
+            create_cart_params = {
               user: spree_current_user,
               store: current_store,
-              currency: current_currency
+              currency: current_currency,
+              public_metadata: add_item_params[:public_metadata],
+              private_metadata: add_item_params[:private_metadata],
             }
 
             order   = spree_current_order if spree_current_order.present?
-            order ||= create_service.call(order_params).value
+            order ||= create_service.call(create_cart_params).value
 
             render_serialized_payload(201) { serialize_resource(order) }
           end
@@ -31,8 +37,10 @@ module Spree
             result = add_item_service.call(
               order: spree_current_order,
               variant: @variant,
-              quantity: params[:quantity],
-              options: params[:options]
+              quantity: add_item_params[:quantity],
+              public_metadata: add_item_params[:public_metadata],
+              private_metadata: add_item_params[:private_metadata],
+              options: add_item_params[:options]
             )
 
             render_order(result)
@@ -107,7 +115,7 @@ module Spree
 
             coupon_codes = select_coupon_codes
 
-            return render_error_payload(Spree.t('v2.cart.no_coupon_code', scope: 'api')) if coupon_codes.empty?
+            return render_error_payload(I18n.t('spree.api.v2.cart.no_coupon_code')) if coupon_codes.empty?
 
             result_errors = coupon_codes.count > 1 ? select_errors(coupon_codes) : select_error(coupon_codes)
 
@@ -209,7 +217,7 @@ module Spree
           end
 
           def load_variant
-            @variant = current_store.variants.find(params[:variant_id])
+            @variant = current_store.variants.find(add_item_params[:variant_id])
           end
 
           def render_error_item_quantity
@@ -227,26 +235,8 @@ module Spree
             ).serializable_hash
           end
 
-          def select_coupon_codes
-            params[:coupon_code].present? ? [params[:coupon_code]] : check_coupon_codes
-          end
-
-          def check_coupon_codes
-            spree_current_order.promotions.coupons.map(&:code)
-          end
-
-          def select_error(coupon_codes)
-            result = coupon_handler.new(spree_current_order).remove(coupon_codes.first)
-            result.error
-          end
-
-          def select_errors(coupon_codes)
-            results = []
-            coupon_codes.each do |coupon_code|
-              results << coupon_handler.new(spree_current_order).remove(coupon_code)
-            end
-
-            results.select(&:error)
+          def add_item_params
+            params.permit(:quantity, :variant_id, public_metadata: {}, private_metadata: {}, options: {})
           end
         end
       end

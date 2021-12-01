@@ -2,7 +2,7 @@ require 'spec_helper'
 
 module Spree
   describe Spree::Order, type: :model do
-    let(:order) { stub_model(Spree::Order) }
+    let(:order) { create(:order) }
     let(:updater) { Spree::OrderUpdater.new(order) }
 
     context 'processing payments' do
@@ -50,7 +50,7 @@ module Spree
             create(
               :store_credit_payment,
               amount: store_credit_amount,
-              payment_method: create(:store_credit_payment_method, auto_capture: false)
+              payment_method: create(:store_credit_payment_method, auto_capture: false, stores: [payment.order.store])
             )
           end
 
@@ -206,7 +206,7 @@ module Spree
     context '#authorize_payments!' do
       subject { order.authorize_payments! }
 
-      let(:payment) { stub_model(Spree::Payment) }
+      let(:payment) { create(:payment) }
 
       before { allow(order).to receive_messages unprocessed_payments: [payment], total: 10 }
 
@@ -221,7 +221,7 @@ module Spree
     context '#capture_payments!' do
       subject { order.capture_payments! }
 
-      let(:payment) { stub_model(Spree::Payment) }
+      let(:payment) { create(:payment) }
 
       before { allow(order).to receive_messages unprocessed_payments: [payment], total: 10 }
 

@@ -1,15 +1,15 @@
 require 'spec_helper'
 
 describe Spree::Api::V2::Platform::StoreSerializer do
-  subject { described_class.new(store) }
+  subject { described_class.new(store).serializable_hash }
 
   let!(:store) { Spree::Store.default }
   let!(:menus) { [create(:menu, store: store), create(:menu, location: 'Footer', store: store)] }
 
-  it { expect(subject.serializable_hash).to be_kind_of(Hash) }
+  it { expect(subject).to be_kind_of(Hash) }
 
   it do
-    expect(subject.serializable_hash).to eq(
+    expect(subject).to eq(
       {
         data: {
           id: store.id.to_s,
@@ -38,7 +38,8 @@ describe Spree::Api::V2::Platform::StoreSerializer do
             new_order_notifications_email: store.new_order_notifications_email,
             seo_robots: store.seo_robots,
             supported_locales: store.supported_locales,
-            deleted_at: store.deleted_at
+            deleted_at: store.deleted_at,
+            settings: store.settings
           },
           relationships: {
             default_country: {
@@ -64,4 +65,6 @@ describe Spree::Api::V2::Platform::StoreSerializer do
       }
     )
   end
+
+  it_behaves_like 'an ActiveJob serializable hash'
 end

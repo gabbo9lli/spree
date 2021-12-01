@@ -1,11 +1,12 @@
 require 'spec_helper'
 
 describe Spree::Payment, type: :model do
-  let(:order) { Spree::Order.create }
+  let(:store) { create(:store) }
+  let(:order) { store.orders.create }
   let(:refund_reason) { create(:refund_reason) }
 
   let(:gateway) do
-    gateway = Spree::Gateway::Bogus.new(active: true)
+    gateway = Spree::Gateway::Bogus.new(active: true, stores: [store])
     allow(gateway).to receive_messages source_required: true
     gateway
   end
@@ -42,7 +43,11 @@ describe Spree::Payment, type: :model do
 
     # So it doesn't create log entries every time a processing method is called
     allow(payment.log_entries).to receive(:create!)
+
+    allow(payment).to receive(:payment_method_available_for_order).and_return(nil)
   end
+
+  it_behaves_like 'metadata'
 
   describe 'Constants' do
     it { expect(Spree::Payment::INVALID_STATES).to eq(%w(failed invalid)) }
@@ -253,13 +258,28 @@ describe Spree::Payment, type: :model do
       end
 
       context 'if unsuccessful' do
-        it 'marks payment as failed' do
-          allow(gateway).to receive(:authorize).and_return(failed_response)
-          expect(payment).to receive(:failure)
-          expect(payment).not_to receive(:pend)
-          expect do
-            payment.authorize!
-          end.to raise_error(Spree::Core::GatewayError)
+        context 'when response is returned from gateway' do
+          it 'marks payment as failed' do
+            allow(gateway).to receive(:authorize).and_return(failed_response)
+            expect(payment).to receive(:failure)
+            expect(payment).not_to receive(:pend)
+            expect do
+              payment.authorize!
+            end.to raise_error(Spree::Core::GatewayError)
+          end
+        end
+
+        context 'when there is an error connecting to the gateway' do
+          let(:connection_error_message) { 'gateway_error' }
+          let(:connection_error) { ActiveMerchant::ConnectionError.new(connection_error_message, nil) }
+
+          before { allow(gateway).to receive(:authorize).and_raise(connection_error) }
+
+          it 'raises ActiveMerchant::ConnectionError and marks payment as failed' do
+            expect(payment).to receive(:failure!)
+            expect(payment).not_to receive(:pend)
+            expect { payment.authorize! }.to raise_error(Spree::Core::GatewayError)
+          end
         end
       end
     end
@@ -307,19 +327,34 @@ describe Spree::Payment, type: :model do
       end
 
       context 'if unsuccessful' do
-        before do
-          allow(gateway).to receive(:purchase).and_return(failed_response)
-          expect(payment).to receive(:failure)
-          expect(payment).not_to receive(:pend)
+        context 'when response is returned from gateway' do
+          before do
+            allow(gateway).to receive(:purchase).and_return(failed_response)
+            expect(payment).to receive(:failure)
+            expect(payment).not_to receive(:pend)
+          end
+
+          it 'makes payment failed' do
+            expect { payment.purchase! }.to raise_error(Spree::Core::GatewayError)
+          end
+
+          it 'does not log a capture event' do
+            expect { payment.purchase! }.to raise_error(Spree::Core::GatewayError)
+            expect(payment.capture_events.count).to eq(0)
+          end
         end
 
-        it 'makes payment failed' do
-          expect { payment.purchase! }.to raise_error(Spree::Core::GatewayError)
-        end
+        context 'when there is an error connecting to the gateway' do
+          let(:connection_error_message) { 'gateway_error' }
+          let(:connection_error) { ActiveMerchant::ConnectionError.new(connection_error_message, nil) }
 
-        it 'does not log a capture event' do
-          expect { payment.purchase! }.to raise_error(Spree::Core::GatewayError)
-          expect(payment.capture_events.count).to eq(0)
+          before { allow(gateway).to receive(:purchase).and_raise(connection_error) }
+
+          it 'raises ActiveMerchant::ConnectionError and marks payment as failed' do
+            expect(payment).to receive(:failure!)
+            expect(payment).not_to receive(:pend)
+            expect { payment.purchase! }.to raise_error(Spree::Core::GatewayError)
+          end
         end
       end
     end
@@ -355,6 +390,7 @@ describe Spree::Payment, type: :model do
             let(:capture_amount) { original_amount - 100 }
 
             before do
+              allow_any_instance_of(Spree::Payment).to receive(:payment_method_available_for_order).and_return(nil)
               expect(payment.payment_method).to receive(:capture).with(capture_amount, payment.response_code, anything).and_return(success_response)
             end
 
@@ -380,11 +416,26 @@ describe Spree::Payment, type: :model do
         end
 
         context 'if unsuccessful' do
-          it 'does not make payment complete' do
-            allow(gateway).to receive_messages capture: failed_response
-            expect(payment).to receive(:failure)
-            expect(payment).not_to receive(:complete)
-            expect { payment.capture! }.to raise_error(Spree::Core::GatewayError)
+          context 'when response is returned from gateway' do
+            it 'does not make payment complete' do
+              allow(gateway).to receive_messages capture: failed_response
+              expect(payment).to receive(:failure)
+              expect(payment).not_to receive(:complete)
+              expect { payment.capture! }.to raise_error(Spree::Core::GatewayError)
+            end
+          end
+
+          context 'when there is an error connecting to the gateway' do
+            let(:connection_error_message) { 'gateway_error' }
+            let(:connection_error) { ActiveMerchant::ConnectionError.new(connection_error_message, nil) }
+
+            before { allow(gateway).to receive(:capture).and_raise(connection_error) }
+
+            it 'raises ActiveMerchant::ConnectionError and marks payment as failed' do
+              expect(payment).to receive(:failure!)
+              expect(payment).not_to receive(:pend)
+              expect { payment.capture! }.to raise_error(Spree::Core::GatewayError)
+            end
           end
         end
       end
@@ -441,10 +492,25 @@ describe Spree::Payment, type: :model do
       end
 
       context 'if unsuccessful' do
-        it 'does not void the payment' do
-          allow(gateway).to receive_messages void: failed_response
-          expect(payment).not_to receive(:void)
-          expect { payment.void_transaction! }.to raise_error(Spree::Core::GatewayError)
+        context 'when response is returned from gateway' do
+          it 'does not void the payment' do
+            allow(gateway).to receive_messages void: failed_response
+            expect(payment).not_to receive(:void)
+            expect { payment.void_transaction! }.to raise_error(Spree::Core::GatewayError)
+          end
+        end
+
+        context 'when there is an error connecting to the gateway' do
+          let(:connection_error_message) { 'gateway_error' }
+          let(:connection_error) { ActiveMerchant::ConnectionError.new(connection_error_message, nil) }
+
+          before { allow(gateway).to receive(:void).and_raise(connection_error) }
+
+          it 'raises ActiveMerchant::ConnectionError and marks payment as failed' do
+            expect(payment).to receive(:failure!)
+            expect(payment).not_to receive(:pend)
+            expect { payment.void_transaction! }.to raise_error(Spree::Core::GatewayError)
+          end
         end
       end
 

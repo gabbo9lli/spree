@@ -7,12 +7,14 @@ require 'spree/testing_support/bar_ability'
 class FooAbility
   include CanCan::Ability
 
+  ORDER_NUMBER = 'N210868'
+
   def initialize(_user)
     # allow anyone to perform index on Order
     can :index, Spree::Order
-    # allow anyone to update an Order with id of 1
+    # allow anyone to update an Order with specific order number
     can :update, Spree::Order do |order|
-      order.id == 1
+      order.number = ORDER_NUMBER
     end
   end
 end
@@ -35,7 +37,7 @@ describe Spree::Ability, type: :model do
 
     it 'applies the registered abilities permissions' do
       Spree::Ability.register_ability(FooAbility)
-      expect(Spree::Ability.new(user).can?(:update, mock_model(Spree::Order, id: 1))).to be true
+      expect(Spree::Ability.new(user).can?(:update, create(:order, number: FooAbility::ORDER_NUMBER))).to be true
     end
   end
 
@@ -47,7 +49,7 @@ describe Spree::Ability, type: :model do
 
     it 'applies the registered abilities permissions' do
       allow_any_instance_of(Spree::Ability).to receive(:abilities_to_register).and_return([FooAbility])
-      expect(Spree::Ability.new(user).can?(:update, mock_model(Spree::Order, id: 1))).to be true
+      expect(Spree::Ability.new(user).can?(:update, create(:order, number: FooAbility::ORDER_NUMBER))).to be true
     end
   end
 
@@ -55,7 +57,10 @@ describe Spree::Ability, type: :model do
     let(:resource) { Object.new }
 
     context 'with admin user' do
-      before { allow(user).to receive(:has_spree_role?).and_return(true) }
+      before do
+        allow(user).to receive(:persisted?).and_return(true)
+        allow(user).to receive(:has_spree_role?).and_return(true)
+      end
 
       it_behaves_like 'access granted'
       it_behaves_like 'index allowed'
@@ -77,12 +82,32 @@ describe Spree::Ability, type: :model do
     let(:fakedispatch_ability) { Spree::Ability.new(fakedispatch_user) }
 
     context 'with admin user' do
-      it 'is able to admin' do
-        allow(user).to receive(:has_spree_role?).with('admin').and_return(true)
-        expect(ability).to be_able_to :admin, resource
-        expect(ability).to be_able_to :index, resource_order
-        expect(ability).to be_able_to :show, resource_product
-        expect(ability).to be_able_to :create, resource_user
+      context 'admin user role' do
+        it 'is able to admin' do
+          allow(user).to receive(:persisted?).and_return(true)
+          allow(user).to receive(:spree_admin?).and_return(true)
+          expect(ability).to be_able_to :admin, resource
+          expect(ability).to be_able_to :index, resource_order
+          expect(ability).to be_able_to :show, resource_product
+          expect(ability).to be_able_to :create, resource_user
+        end
+      end
+
+      context 'admin user class' do
+        let(:user) { Spree::DummyModel.create(name: 'admin') }
+
+        before { Spree.admin_user_class = 'Spree::DummyModel' }
+
+        after { Spree.admin_user_class = nil }
+
+        it 'is able to admin' do
+          allow(user).to receive(:persisted?).and_return(true)
+          allow(user).to receive(:spree_admin?).and_return(true)
+          expect(ability).to be_able_to :admin, resource
+          expect(ability).to be_able_to :index, resource_order
+          expect(ability).to be_able_to :show, resource_product
+          expect(ability).to be_able_to :create, resource_user
+        end
       end
     end
 
@@ -115,7 +140,7 @@ describe Spree::Ability, type: :model do
         # It can create new users if is has access to the :admin, User!!
         expect(ability).to be_able_to :create, user
 
-        # TODO: change the Ability class so only users and customers get the extra premissions?
+        # TODO: change the Ability class so only users and customers get the extra permissions?
 
         Spree::Ability.remove_ability(BarAbility)
       end
@@ -181,7 +206,7 @@ describe Spree::Ability, type: :model do
         it_behaves_like 'no index allowed'
       end
 
-      context 'requested with inproper token' do
+      context 'requested with improper token' do
         let(:token) { 'FAIL' }
 
         before { allow(resource).to receive_messages token: token }

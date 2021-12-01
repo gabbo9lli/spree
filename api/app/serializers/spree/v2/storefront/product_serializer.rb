@@ -6,7 +6,7 @@ module Spree
 
         set_type :product
 
-        attributes :name, :description, :available_on, :slug, :meta_description, :meta_keywords, :updated_at, :sku
+        attributes :name, :description, :available_on, :slug, :meta_description, :meta_keywords, :updated_at, :sku, :public_metadata
 
         attribute :purchasable do |product|
           product.purchasable?
@@ -49,7 +49,7 @@ module Spree
         has_many :product_properties
 
         has_many :taxons, serializer: :taxon, record_type: :taxon do |object, params|
-          object.taxons_for_store(params[:store])
+          object.taxons_for_store(params[:store]).order(:id)
         end
 
         # all images from all variants
