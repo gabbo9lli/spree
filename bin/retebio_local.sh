@@ -41,8 +41,8 @@ if [ ! -d "retebio" ]; then
   exit 1
 fi
 
-if [ "$DB" == "postgres" ]; then
-  cp bin/database.yml retebio/config/database.yml
+if [ "$DB" = "postgres" ]; then
+  cp bin/database_aws.yml retebio/config/database.yml
 fi
 
 cd ./retebio
@@ -83,6 +83,7 @@ end
 
 # ExecJS runtime
 gem 'mini_racer'
+#, '0.5.0'
 
 # temporary fix for sassc segfaults on ruby 3.0.0 on Mac OS Big Sur
 # this change fixes the issue:
