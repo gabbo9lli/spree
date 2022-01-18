@@ -42,7 +42,7 @@ if [ ! -d "retebio" ]; then
 fi
 
 if [ "$DB" = "postgres" ]; then
-  cp bin/database_aws.yml retebio/config/database.yml
+  cp bin/database.yml retebio/config/database.yml
 fi
 
 cd ./retebio
