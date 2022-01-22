@@ -27,7 +27,7 @@ module Spree
           next if name.to_s.include?('master_price')
 
           parts = name.to_s.match(/(.*)_by_(.*)/)
-          scope(name.to_s, -> { order(Arel.sql("#{Product.quoted_table_name}.#{parts[2]} #{parts[1] == 'ascend' ? 'ASC' : 'DESC'}")) })
+          scope(name.to_s, -> { order(Arel.sql(sanitize_sql("#{Product.quoted_table_name}.#{parts[2]} #{parts[1] == 'ascend' ? 'ASC' : 'DESC'}"))) })
         end
       end
 
@@ -162,7 +162,7 @@ module Spree
                          else
                            if OptionType.column_for_attribute('id').type == :uuid
                              OptionType.where(id: option).or(OptionType.where(name: option))&.first&.id
-                           else 
+                           else
                              OptionType.where(name: option)&.first&.id
                            end
                          end
@@ -236,7 +236,7 @@ module Spree
 
       def self.not_discontinued(only_not_discontinued = true)
         if only_not_discontinued != '0' && only_not_discontinued
-          where("#{Product.quoted_table_name}.discontinue_on IS NULL or #{Product.quoted_table_name}.discontinue_on >= ?", Time.zone.now)
+          where.not(status: 'archived')
         else
           all
         end
@@ -253,9 +253,11 @@ module Spree
 
       # Can't use add_search_scope for this as it needs a default argument
       def self.available(available_on = nil, currency = nil)
-        available_on ||= Time.current
-
-        scope = not_discontinued.where("#{Product.quoted_table_name}.available_on <= ?", available_on)
+        if available_on
+          scope = not_discontinued.where("#{Product.quoted_table_name}.available_on <= ?", available_on)
+        else
+          scope = where(status: 'active')
+        end
 
         unless Spree::Config.show_products_without_price
           currency ||= Spree::Store.default.default_currency
@@ -282,7 +284,7 @@ module Spree
         if user.try(:has_spree_role?, 'admin')
           with_deleted
         else
-          not_deleted.not_discontinued.where("#{Product.quoted_table_name}.available_on <= ?", Time.current)
+          not_deleted.where(status: 'active')
         end
       end
 

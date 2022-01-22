@@ -14,14 +14,15 @@ describe 'API V2 Storefront Products Spec', type: :request do
   let!(:variant)                   { create(:variant, product: product_with_option, option_values: [option_value]) }
   let(:product)                    { create(:product, stores: [store]) }
   let!(:deleted_product)           { create(:product, deleted_at: Time.current - 1.day, stores: [store]) }
-  let!(:discontinued_product)      { create(:product, discontinue_on: Time.current - 1.day, stores: [store]) }
-  let!(:not_available_product)     { create(:product, available_on: nil, stores: [store]) }
+  let!(:discontinued_product)      { create(:product, status: 'archived', discontinue_on: Time.current - 1.day, stores: [store]) }
+  let!(:not_available_product)     { create(:product, status: 'draft', stores: [store]) }
   let!(:in_stock_product)          { create(:product_in_stock, stores: [store]) }
   let!(:not_backorderable_product) { create(:product_in_stock, :without_backorder, stores: [store]) }
   let!(:property)                  { create(:property) }
   let!(:new_property)              { create(:property) }
-  let!(:product_with_property)     { create(:product, properties: [property], stores: [store]) }
+  let!(:product_with_property)     { create(:product, stores: [store]) }
   let!(:product_property)          { create(:product_property, property: new_property, product: product_with_property, value: 'Some Value') }
+  let!(:product_property2)          { create(:product_property, property: property, product: product_with_property, value: 'Some Value 2') }
 
   before { Spree::Api::Config[:api_v2_per_page_limit] = 4 }
 
@@ -427,7 +428,7 @@ describe 'API V2 Storefront Products Spec', type: :request do
       end
 
       context 'sorting by available_on' do
-        before { store.products.each_with_index { |p, i| p.update(available_on: Time.current - i.days) } }
+        before { store.products.each_with_index { |p, i| p.update(status: 'active', available_on: Time.current - i.days) } }
 
         context 'ascending order' do
           before { get '/api/v2/storefront/products?sort=available_on' }

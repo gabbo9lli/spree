@@ -25,6 +25,12 @@ module Spree
     include MultiStoreResource
     include MemoizedData
     include Metadata
+    if defined?(Spree::Webhooks)
+      include Spree::Webhooks::HasWebhooks
+    end
+    if defined?(Spree::VendorConcern)
+      include Spree::VendorConcern
+    end
 
     MEMOIZED_METHODS = %w(total_on_hand taxonomy_ids taxon_and_ancestors category
                           default_variant_id tax_category default_variant
@@ -36,7 +42,7 @@ module Spree
 
     # we need to have this callback before any dependent: :destroy associations
     # https://github.com/rails/rails/issues/3458
-    before_destroy :ensure_no_line_items
+    before_destroy :ensure_not_in_complete_orders
 
     has_many :product_option_types, dependent: :destroy, inverse_of: :product
     has_many :option_types, through: :product_option_types
@@ -118,7 +124,7 @@ module Spree
     end
 
     validates :slug, presence: true, uniqueness: { allow_blank: true, case_sensitive: true, scope: spree_base_uniqueness_scope }
-    validate :discontinue_on_must_be_later_than_available_on, if: -> { available_on && discontinue_on }
+    validate :discontinue_on_must_be_later_than_make_active_at, if: -> { make_active_at && discontinue_on }
 
     scope :for_store, ->(store) { joins(:store_products).where(StoreProduct.table_name => { store_id: store.id }) }
 
@@ -129,7 +135,7 @@ module Spree
     alias options product_option_types
 
     self.whitelisted_ransackable_associations = %w[taxons stores variants_including_master master variants]
-    self.whitelisted_ransackable_attributes = %w[description name slug discontinue_on]
+    self.whitelisted_ransackable_attributes = %w[description name slug discontinue_on status]
     self.whitelisted_ransackable_scopes = %w[not_discontinued search_by_name in_taxon price_between]
 
     [
@@ -225,14 +231,16 @@ module Spree
     end
 
     # determine if product is available.
-    # deleted products and products with nil or future available_on date
+    # deleted products and products with status different than active
     # are not available
     def available?
-      !(available_on.nil? || available_on.future?) && !deleted? && !discontinued?
+      status == 'active' && !deleted?
     end
 
     def discontinue!
-      update_attribute(:discontinue_on, Time.current)
+      self.discontinue_on = Time.current
+      self.status = 'archived'
+      save(validate: false)
     end
 
     def discontinued?
@@ -296,7 +304,7 @@ module Spree
     def total_on_hand
       @total_on_hand ||= Rails.cache.fetch(['product-total-on-hand', cache_key_with_version]) do
         if any_variants_not_track_inventory?
-          Float::INFINITY
+          BigDecimal::INFINITY
         else
           stock_items.sum(:count_on_hand)
         end
@@ -327,9 +335,13 @@ module Spree
     def any_variant_in_stock_or_backorderable?
       if variants.any?
         variants_including_master.in_stock_or_backorderable.exists?
-      else 
+      else
         master.in_stock_or_backorderable?
       end
+    end
+
+    def digital?
+      shipping_category == I18n.t('spree.seed.shipping.categories.digital')
     end
 
     private
@@ -337,7 +349,7 @@ module Spree
     def add_associations_from_prototype
       if prototype_id && prototype = Spree::Prototype.find_by(id: prototype_id)
         prototype.properties.each do |property|
-          product_properties.create(property: property)
+          product_properties.create(property: property, value: 'Placeholder')
         end
         self.option_types = prototype.option_types
         self.taxons = prototype.taxons
@@ -473,8 +485,8 @@ module Spree
       Spree::Taxonomy.where(id: taxonomy_ids).update_all(updated_at: Time.current)
     end
 
-    def ensure_no_line_items
-      if line_items.any?
+    def ensure_not_in_complete_orders
+      if orders.complete.any?
         errors.add(:base, :cannot_destroy_if_attached_to_line_items)
         throw(:abort)
       end
@@ -485,8 +497,8 @@ module Spree
       removed_classifications.each &:remove_from_list
     end
 
-    def discontinue_on_must_be_later_than_available_on
-      if discontinue_on < available_on
+    def discontinue_on_must_be_later_than_make_active_at
+      if discontinue_on < make_active_at
         errors.add(:discontinue_on, :invalid_date_range)
       end
     end

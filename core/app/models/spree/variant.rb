@@ -5,20 +5,24 @@ module Spree
 
     include MemoizedData
     include Metadata
+    if defined?(Spree::Webhooks)
+      include Spree::Webhooks::HasWebhooks
+    end
 
     MEMOIZED_METHODS = %w(purchasable in_stock backorderable tax_category options_text compare_at_price)
 
     belongs_to :product, -> { with_deleted }, touch: true, class_name: 'Spree::Product', inverse_of: :variants
     belongs_to :tax_category, class_name: 'Spree::TaxCategory', optional: true
 
-    delegate :name, :name=, :description, :slug, :available_on, :shipping_category_id,
+    delegate :name, :name=, :description, :slug, :available_on, :make_active_at, :shipping_category_id,
              :meta_description, :meta_keywords, :shipping_category, to: :product
 
     # we need to have this callback before any dependent: :destroy associations
     # https://github.com/rails/rails/issues/3458
-    before_destroy :ensure_no_line_items
+    before_destroy :ensure_not_in_complete_orders
+    after_destroy :remove_line_items_from_incomplete_orders
 
-    # must include this after ensure_no_line_items to make sure price won't be deleted before validation
+    # must include this after ensure_not_in_complete_orders to make sure price won't be deleted before validation
     include Spree::DefaultPrice
 
     with_options inverse_of: :variant do
@@ -206,7 +210,20 @@ module Spree
     end
 
     def price_in(currency)
-      prices.detect { |price| price.currency == currency&.upcase } || prices.build(currency: currency&.upcase)
+      currency = currency&.upcase
+      find_or_build_price = lambda do
+        if prices.loaded?
+          prices.detect { |price| price.currency == currency } || prices.build(currency: currency)
+        else
+          prices.find_or_initialize_by(currency: currency)
+        end
+      end
+
+      Rails.cache.fetch("spree/prices/#{cache_key_with_version}/price_in/#{currency}") do
+        find_or_build_price.call
+      end
+    rescue TypeError
+      find_or_build_price.call
     end
 
     def amount_in(currency)
@@ -312,11 +329,15 @@ module Spree
 
     private
 
-    def ensure_no_line_items
-      if line_items.any?
+    def ensure_not_in_complete_orders
+      if orders.complete.any?
         errors.add(:base, :cannot_destroy_if_attached_to_line_items)
         throw(:abort)
       end
+    end
+
+    def remove_line_items_from_incomplete_orders
+      Spree::Variants::RemoveFromIncompleteOrdersJob.perform_later(self)
     end
 
     def quantifier
