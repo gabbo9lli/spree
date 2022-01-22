@@ -5,13 +5,13 @@ class CreateSpreeProductsStores < ActiveRecord::Migration[5.2]
         add_index :spree_products_stores, [:product_id, :store_id], unique: true
       end
       unless column_exists?(:spree_products_stores, :created_at)
-        add_timestamps :spree_products_stores
+        add_timestamps :spree_products_stores, default: Time.current
       end
     else
       create_table :spree_products_stores do |t|
         t.references :product, index: true
         t.references :store,  index: true
-        t.timestamps
+        t.timestamps default: Time.current
 
         t.index [:product_id, :store_id], unique: true
       end
