@@ -5,7 +5,8 @@ set -x
 set -e
 
 DB="postgres"
-echo $DB
+env="production"
+echo $DB, $env
 SPREE_DASHBOARD_PATH="../backend"
 
 case "$DB" in
@@ -24,8 +25,8 @@ sqlite|'')
   ;;
 esac
 
-rm -rf ./retebio
-bundle exec rails new retebio --database="$RAILSDB" \
+rm -rf ./sandbox
+RAILS_ENV=$env bundle exec rails new sandbox --database="$RAILSDB" \
   --skip-bundle \
   --skip-git \
   --skip-keeps \
@@ -36,16 +37,16 @@ bundle exec rails new retebio --database="$RAILSDB" \
   --skip-javascript \
   --skip-bootsnap
 
-if [ ! -d "retebio" ]; then
-  echo 'retebio rails application failed'
+if [ ! -d "sandbox" ]; then
+  echo 'sandbox rails application failed'
   exit 1
 fi
 
 if [ "$DB" = "postgres" ]; then
-  cp bin/database.yml retebio/config/database.yml
+  cp bin/database.yml sandbox/config/database.yml
 fi
 
-cd ./retebio
+cd ./sandbox
 
 if [ "$SPREE_AUTH_DEVISE_PATH" != "" ]; then
   SPREE_AUTH_DEVISE_GEM="gem 'spree_auth_devise', path: '$SPREE_AUTH_DEVISE_PATH'"
@@ -96,9 +97,9 @@ gem 'oj'
 gem 'jsbundling-rails'
 RUBY
 
-cat <<RUBY >> config/environments/development.rb
-Rails.application.config.hosts.clear
-RUBY
+#cat <<RUBY >> config/environments/development.rb
+#Rails.application.config.hosts.clear
+#RUBY
 
 touch config/initializers/oj.rb
 
@@ -111,7 +112,7 @@ RUBY
 touch config/initializers/bullet.rb
 
 cat <<RUBY >> config/initializers/bullet.rb
-if Rails.env.development? && defined?(Bullet)
+if defined?(Bullet)
   Bullet.enable = true
   Bullet.rails_logger = true
   Bullet.stacktrace_includes = [ 'spree_core', 'spree_frontend', 'spree_api', 'spree_backend', 'spree_emails' ]
@@ -123,26 +124,17 @@ bundle install --gemfile Gemfile
 bin/rails javascript:install:esbuild
 yarn install
 
-#bin/rails db:drop || true
-#bin/rails db:create
-#bin/rails g spree:install --auto-accept --user_class=Spree::User #--sample=true
-#bundle exec rails g spree:frontend:install
-#bin/rails g spree:backend:install
-#bin/rails g spree:emails:install
-#bin/rails g spree:auth:install
-#bin/rails g spree_gateway:install
-
-bundle install --gemfile Gemfile
-bundle exec rails db:drop || true
-bundle exec rails db:create --trace
-bundle exec rails g spree:install --auto-accept --user_class=Spree::User #--sample=true
+RAILS_ENV=$env bundle install --gemfile Gemfile
+RAILS_ENV=$env bundle exec rails db:drop || true
+RAILS_ENV=$env bundle exec rails db:create --trace
+RAILS_ENV=$env bundle exec rails g spree:install --auto-accept --user_class=Spree::User #--sample=true
 if [ "$SPREE_HEADLESS" = "" ]; then
-bundle exec rails g spree:frontend:install
-bundle exec rails g spree:backend:install
-bundle exec rails g spree:emails:install
+RAILS_ENV=$env bundle exec rails g spree:frontend:install
+RAILS_ENV=$env bundle exec rails g spree:backend:install
+RAILS_ENV=$env bundle exec rails g spree:emails:install
 fi
-bundle exec rails g spree:auth:install
-bundle exec rails g spree_gateway:install
+RAILS_ENV=$env bundle exec rails g spree:auth:install
+RAILS_ENV=$env bundle exec rails g spree_gateway:install
 
 set +x
 
