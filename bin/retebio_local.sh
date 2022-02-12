@@ -1,12 +1,11 @@
 #!/bin/sh
-# Used in the sandbox rake task in Rakefile
+# Used in the retebio rake task in Rakefile
 
 set -x
 set -e
 
 DB="postgres"
-env="production"
-echo $DB, $env
+echo $DB
 SPREE_DASHBOARD_PATH="../backend"
 
 case "$DB" in
@@ -25,8 +24,8 @@ sqlite|'')
   ;;
 esac
 
-rm -rf ./sandbox
-RAILS_ENV=$env bundle exec rails new sandbox --database="$RAILSDB" \
+rm -rf ./retebio
+bundle exec rails new retebio --database="$RAILSDB" \
   --skip-bundle \
   --skip-git \
   --skip-keeps \
@@ -37,27 +36,27 @@ RAILS_ENV=$env bundle exec rails new sandbox --database="$RAILSDB" \
   --skip-javascript \
   --skip-bootsnap
 
-if [ ! -d "sandbox" ]; then
-  echo 'sandbox rails application failed'
+if [ ! -d "retebio" ]; then
+  echo 'retebio rails application failed'
   exit 1
 fi
 
 if [ "$DB" = "postgres" ]; then
-  cp bin/database.yml sandbox/config/database.yml
+  cp bin/database.yml retebio/config/database.yml
 fi
 
-cd ./sandbox
+cd ./retebio
 
 if [ "$SPREE_AUTH_DEVISE_PATH" != "" ]; then
   SPREE_AUTH_DEVISE_GEM="gem 'spree_auth_devise', path: '$SPREE_AUTH_DEVISE_PATH'"
 else
-  SPREE_AUTH_DEVISE_GEM="gem 'spree_auth_devise', github: 'spree/spree_auth_devise', tag: 'v4.3.3'"
+  SPREE_AUTH_DEVISE_GEM="gem 'spree_auth_devise', '~> 4.3'" #github: 'spree/spree_auth_devise', tag: 'v4.3.3'"
 fi
 
 if [ "$SPREE_GATEWAY_PATH" != "" ]; then
   SPREE_GATEWAY_GEM="gem 'spree_gateway', path: '$SPREE_GATEWAY_PATH'"
 else
-  SPREE_GATEWAY_GEM="gem 'spree_gateway', github: 'spree/spree_gateway', tag: 'v3.9.4'" #branch: 'main'"
+  SPREE_GATEWAY_GEM="gem 'spree_gateway', '~> 3.9'" #github: 'spree/spree_gateway', tag: 'v3.9.4'" #branch: 'main'"
 fi
 
 if [ "$SPREE_DASHBOARD_PATH" != "" ]; then
@@ -74,7 +73,7 @@ gem 'spree_sample', path: '../sample'
 $SPREE_BACKEND_GEM
 $SPREE_AUTH_DEVISE_GEM
 $SPREE_GATEWAY_GEM
-gem 'spree_i18n', github: 'spree-contrib/spree_i18n', tag: 'v5.0.0' #branch: 'main'
+gem 'spree_i18n', '~> 5.0' #github: 'spree-contrib/spree_i18n', tag: 'v5.0.0' #branch: 'main'
 
 group :test, :development do
     gem 'bullet'
@@ -97,9 +96,9 @@ gem 'oj'
 gem 'jsbundling-rails'
 RUBY
 
-#cat <<RUBY >> config/environments/development.rb
-#Rails.application.config.hosts.clear
-#RUBY
+cat <<RUBY >> config/environments/development.rb
+Rails.application.config.hosts.clear
+RUBY
 
 touch config/initializers/oj.rb
 
@@ -124,17 +123,17 @@ bundle install --gemfile Gemfile
 bin/rails javascript:install:esbuild
 yarn install
 
-RAILS_ENV=$env bundle install --gemfile Gemfile
-RAILS_ENV=$env bundle exec rails db:drop || true
-RAILS_ENV=$env bundle exec rails db:create --trace
-RAILS_ENV=$env bundle exec rails g spree:install --auto-accept --user_class=Spree::User #--sample=true
+bundle install --gemfile Gemfile
+bundle exec rails db:drop || true
+bundle exec rails db:create --trace
+bundle exec rails g spree:install --auto-accept --user_class=Spree::User #--sample=true
 if [ "$SPREE_HEADLESS" = "" ]; then
-RAILS_ENV=$env bundle exec rails g spree:frontend:install
-RAILS_ENV=$env bundle exec rails g spree:backend:install
-RAILS_ENV=$env bundle exec rails g spree:emails:install
+bundle exec rails g spree:frontend:install
+bundle exec rails g spree:backend:install
+bundle exec rails g spree:emails:install
 fi
-RAILS_ENV=$env bundle exec rails g spree:auth:install
-RAILS_ENV=$env bundle exec rails g spree_gateway:install
+bundle exec rails g spree:auth:install
+bundle exec rails g spree_gateway:install
 
 set +x
 

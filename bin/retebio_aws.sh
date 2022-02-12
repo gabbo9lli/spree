@@ -1,5 +1,5 @@
 #!/bin/sh
-# Used in the sandbox rake task in Rakefile
+# Used in the retebio rake task in Rakefile
 
 set -x
 set -e
@@ -50,13 +50,13 @@ cd ./retebio
 if [ "$SPREE_AUTH_DEVISE_PATH" != "" ]; then
   SPREE_AUTH_DEVISE_GEM="gem 'spree_auth_devise', path: '$SPREE_AUTH_DEVISE_PATH'"
 else
-  SPREE_AUTH_DEVISE_GEM="gem 'spree_auth_devise', github: 'spree/spree_auth_devise', tag: 'v4.3.3'"
+  SPREE_AUTH_DEVISE_GEM="gem 'spree_auth_devise', '~> 4.3'" #github: 'spree/spree_auth_devise', tag: 'v4.3.3'"
 fi
 
 if [ "$SPREE_GATEWAY_PATH" != "" ]; then
   SPREE_GATEWAY_GEM="gem 'spree_gateway', path: '$SPREE_GATEWAY_PATH'"
 else
-  SPREE_GATEWAY_GEM="gem 'spree_gateway', github: 'spree/spree_gateway', tag: 'v3.9.4'" #branch: 'main'"
+  SPREE_GATEWAY_GEM="gem 'spree_gateway', '~> 3.9'" #github: 'spree/spree_gateway', tag: 'v3.9.4'" #branch: 'main'"
 fi
 
 if [ "$SPREE_DASHBOARD_PATH" != "" ]; then
@@ -73,7 +73,7 @@ gem 'spree_sample', path: '../sample'
 $SPREE_BACKEND_GEM
 $SPREE_AUTH_DEVISE_GEM
 $SPREE_GATEWAY_GEM
-gem 'spree_i18n', github: 'spree-contrib/spree_i18n', tag: 'v5.0.0' #branch: 'main'
+gem 'spree_i18n', '~> 5.0' #github: 'spree-contrib/spree_i18n', tag: 'v5.0.0' #branch: 'main'
 
 group :test, :development do
     gem 'bullet'
@@ -111,7 +111,7 @@ RUBY
 touch config/initializers/bullet.rb
 
 cat <<RUBY >> config/initializers/bullet.rb
-if Rails.env.development? && defined?(Bullet)
+if defined?(Bullet)
   Bullet.enable = true
   Bullet.rails_logger = true
   Bullet.stacktrace_includes = [ 'spree_core', 'spree_frontend', 'spree_api', 'spree_backend', 'spree_emails' ]
@@ -122,15 +122,6 @@ bundle install --gemfile Gemfile
 
 bin/rails javascript:install:esbuild
 yarn install
-
-#bin/rails db:drop || true
-#bin/rails db:create
-#bin/rails g spree:install --auto-accept --user_class=Spree::User #--sample=true
-#bundle exec rails g spree:frontend:install
-#bin/rails g spree:backend:install
-#bin/rails g spree:emails:install
-#bin/rails g spree:auth:install
-#bin/rails g spree_gateway:install
 
 bundle install --gemfile Gemfile
 bundle exec rails db:drop || true
