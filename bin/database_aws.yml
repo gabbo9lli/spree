@@ -3,7 +3,7 @@
 development:
   adapter: postgresql
   encoding: unicode
-  database: retebio2_dev
+  database: retebio_43_aws_development
   pool: 5
   username: retebio
   password: Retebio1234_
@@ -15,7 +15,7 @@ development:
 test:
   adapter: postgresql
   encoding: unicode
-  database: retebio2_test
+  database: retebio_43_aws_test
   pool: 5
   username: retebio
   password: Retebio1234_
@@ -24,7 +24,7 @@ test:
 production:
   adapter: postgresql
   encoding: unicode
-  database: retebio2_production
+  database: retebio_43_aws_production
   pool: 5
   username: retebio
   password: Retebio1234_
