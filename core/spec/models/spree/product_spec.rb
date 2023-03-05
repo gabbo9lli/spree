@@ -69,6 +69,18 @@ describe Spree::Product, type: :model do
         expect(clone.images.size).to eq(product.images.size)
       end
 
+      context 'when translations exist for another locale' do
+        before do
+          Mobility.with_locale(:fr) { product.name = "french name" }
+          product.save!
+        end
+
+        it 'duplicates translations for all locales' do
+          clone = product.duplicate
+          expect(clone.name(locale: :fr)).to eq ('COPY OF ' + product.name(locale: :fr))
+        end
+      end
+
       it 'calls #duplicate_extra' do
         expect_any_instance_of(Spree::Product).to receive(:duplicate_extra).
           with(product)
@@ -236,7 +248,21 @@ describe Spree::Product, type: :model do
 
       context 'when product destroyed' do
         it 'renames slug' do
-          expect { product.destroy }.to change(product, :slug)
+          product.destroy
+          expect(product.translations.with_deleted.where(locale: :en).first.slug).to match(/[0-9]+_product-[0-9]+/)
+        end
+
+        context 'when more than one translation exists' do
+          before {
+            product.send(:slug=, "french_slug", locale: :fr)
+            product.save!
+          }
+
+          it 'renames slug for all translations' do
+            product.destroy
+            expect(product.translations.with_deleted.where(locale: :en).first.slug).to match(/[0-9]+_product-[0-9]+/)
+            expect(product.translations.with_deleted.where(locale: :fr).first.slug).to match(/[0-9]+_french_slug/)
+          end
         end
 
         context 'when slug is already at or near max length' do
@@ -326,6 +352,12 @@ describe Spree::Product, type: :model do
         expect(@product.slugs.with_deleted).not_to be_empty
       end
 
+      it 'keeps translations when product is destroyed' do
+        @product.destroy
+
+        expect(@product.name).not_to be_empty
+      end
+
       it 'updates the history when the product is restored' do
         @product.destroy
 
@@ -407,7 +439,7 @@ describe Spree::Product, type: :model do
 
     # Regression test for #2455
     it "does not overwrite properties' presentation names" do
-      Spree::Property.where(name: 'foo').first_or_create!(presentation: "Foo's Presentation Name")
+      Spree::Property.create!(name: 'foo', presentation: "Foo's Presentation Name")
       product.set_property('foo', 'value1')
       product.set_property('bar', 'value2')
       expect(Spree::Property.where(name: 'foo').first.presentation).to eq("Foo's Presentation Name")
@@ -869,6 +901,20 @@ describe Spree::Product, type: :model do
             it { expect(subject).to eq(true) }
           end
         end
+      end
+    end
+
+    describe '#digital?' do
+      context 'when product is not digital' do
+        let(:product) { create(:product, stores: [store]) }
+
+        it { expect(product.digital?).to eq(false) }
+      end
+
+      context 'when product is digital' do
+        let(:product) { create(:product, stores: [store], shipping_category: create(:shipping_category, name: 'Digital')) }
+
+        it { expect(product.digital?).to eq(true) }
       end
     end
   end

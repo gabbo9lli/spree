@@ -11,7 +11,10 @@ describe Spree::Webhooks::Subscribers::HandleRequest do
     end
 
     let(:webhook_payload_body) do
-      Spree::Api::V2::Platform::AddressSerializer.new(resource).serializable_hash.to_json
+      Spree::Api::V2::Platform::AddressSerializer.new(
+        resource,
+        include: Spree::Api::V2::Platform::AddressSerializer.relationships_to_serialize.keys
+      ).serializable_hash.to_json
     end
     let(:event_name) { 'order.canceled' }
     let(:event) { Spree::Webhooks::Event.find_by(name: event_name, subscriber_id: subscriber.id, url: url) }
@@ -32,6 +35,10 @@ describe Spree::Webhooks::Subscribers::HandleRequest do
           ).to_json
         end
 
+        let(:event_signature) do
+          Spree::Webhooks::EventSignature.new(event, body_with_event_metadata).computed_signature
+        end
+
         it 'debug logs' do
           allow(Rails.logger).to receive(:debug)
           allow(Spree::Webhooks::Subscribers::MakeRequest).to receive(:new).and_call_original
@@ -40,9 +47,14 @@ describe Spree::Webhooks::Subscribers::HandleRequest do
           message_snd = "[SPREE WEBHOOKS] 'order.canceled' webhook_payload_body: #{body_with_event_metadata}"
           expect(Rails.logger).to have_received(:debug).with(message_fst)
           expect(Rails.logger).to have_received(:debug).with(message_snd)
-          expect(Spree::Webhooks::Subscribers::MakeRequest).to(
-            have_received(:new).with(webhook_payload_body: body_with_event_metadata, url: url)
-          )
+
+          expect(Spree::Webhooks::Subscribers::MakeRequest).to \
+            have_received(:new).
+            with(
+              signature: event_signature,
+              url: url,
+              webhook_payload_body: body_with_event_metadata
+            )
         end
 
         it "#{with_log_level} logs" do
@@ -134,7 +146,12 @@ describe Spree::Webhooks::Subscribers::HandleRequest do
     end
 
     context 'full flow' do
-      let(:webhook_payload_body) { Spree::Api::V2::Platform::OrderSerializer.new(order.reload).serializable_hash }
+      let(:webhook_payload_body) do
+        Spree::Api::V2::Platform::OrderSerializer.new(
+          order.reload,
+          include: Spree::Api::V2::Platform::OrderSerializer.relationships_to_serialize.keys
+        ).serializable_hash
+      end
       let(:event) { Spree::Webhooks::Event.find_by(name: event_name, subscriber_id: subscriber.id, url: url) }
       let(:event_name) { 'order.placed' }
       let(:order) { create(:order, email: 'test@example.com') }
@@ -163,13 +180,21 @@ describe Spree::Webhooks::Subscribers::HandleRequest do
           ).to_json
         end
 
+        let(:event_signature) do
+          Spree::Webhooks::EventSignature.new(event, body_with_event_metadata).computed_signature
+        end
+
         it 'adds the event data to the body' do
           with_webhooks_enabled do
             allow(Spree::Webhooks::Subscribers::MakeRequest).to receive(:new).and_call_original
             order.finalize!
-            expect(Spree::Webhooks::Subscribers::MakeRequest).to(
-              have_received(:new).with(webhook_payload_body: body_with_event_metadata, url: url)
-            )
+            expect(Spree::Webhooks::Subscribers::MakeRequest).to \
+              have_received(:new).
+              with(
+                signature: event_signature,
+                url: url,
+                webhook_payload_body: body_with_event_metadata
+              )
           end
         end
       end

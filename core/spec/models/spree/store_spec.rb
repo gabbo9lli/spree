@@ -142,46 +142,6 @@ describe Spree::Store, type: :model do
   end
 
   describe 'validations' do
-    describe 'favicon image' do
-      it 'validates image properties' do
-        expect(build(:store, :with_favicon, filepath: file_fixture('icon_256x256.png'))).to be_valid
-
-        expect(build(:store, :with_favicon, filepath: file_fixture('icon_512x512.png'))).not_to be_valid
-        expect(build(:store, :with_favicon, filepath: file_fixture('icon_256x256.gif'))).not_to be_valid
-        expect(build(:store, :with_favicon, filepath: file_fixture('img_256x128.png'))).not_to be_valid
-      end
-
-      context 'file size' do
-        let(:store) do
-          store = build(:store)
-          store.favicon_image.attach(io: file, filename: 'favicon.png')
-          store
-        end
-
-        let(:file) { File.open(file_fixture('icon_256x256.png')) }
-
-        before do
-          allow(file).to receive(:size).and_return(size)
-        end
-
-        context 'when size is 1 megabyte' do
-          let(:size) { 1.megabyte }
-
-          it 'is valid' do
-            expect(store.valid?).to be(true)
-          end
-        end
-
-        context 'when size is over 1 megabyte' do
-          let(:size) { 1.megabyte + 1 }
-
-          it 'is invalid' do
-            expect(store.valid?).to be(false)
-          end
-        end
-      end
-    end
-
     describe 'code uniqueness' do
       context 'selected code was already used in a deleted store' do
         let(:store_code) { 'store_code' }
@@ -223,8 +183,8 @@ describe Spree::Store, type: :model do
     end
 
     it 'returns store for domain' do
-      expect(subject.class.current('spreecommerce.com')).to eql(store_1)
-      expect(subject.class.current('www.subdomain.com')).to eql(store_2)
+      expect(Spree::Stores::FindCurrent.new(url: 'spreecommerce.com').execute).to eql(store_1)
+      expect(Spree::Stores::FindCurrent.new(url: 'www.subdomain.com').execute).to eql(store_2)
     end
   end
 
@@ -265,12 +225,19 @@ describe Spree::Store, type: :model do
     end
 
     context 'when a default store is not present' do
-      it 'builds a new default store' do
+      before do
+        described_class::Translation.delete_all
         described_class.delete_all
         Rails.cache.clear
+      end
+
+      it 'builds a new default store' do
         expect(described_class.default.class).to eq(described_class)
-        expect(described_class.default.persisted?).to eq(false)
         expect(described_class.default.default).to be(true)
+      end
+
+      it 'does not persist the original default store' do
+        expect(described_class.default.persisted?).to eq(false)
       end
     end
   end
@@ -679,7 +646,7 @@ describe Spree::Store, type: :model do
 
       it "doesn't destroy associations" do
         associations = described_class.reflect_on_all_associations(:has_many)
-        expect(associations.select { |a| a.options[:dependent] }).to be_empty
+        expect(associations.select { |a| a.options[:dependent] }.count).to equal(1)
       end
     end
   end

@@ -300,7 +300,8 @@ describe Spree::Variant, type: :model do
           multi_variant.set_option_value('media_type', 'CD')
 
           expect do
-            multi_variant.set_option_value('media_type', 'DVD')
+            multi_variant.set_option_value('media_type ', ' DVD ')
+            multi_variant.set_option_value('Media_Type  ', ' dvd ')
           end.not_to change(multi_variant.option_values, :count)
 
           expect do
@@ -717,6 +718,47 @@ describe Spree::Variant, type: :model do
 
       it 'returns the tax_category set on itself' do
         expect(variant.tax_category).to eq(tax_category)
+      end
+    end
+
+    context 'when tax category is deleted' do
+      let(:tax_category) { create(:tax_category) }
+      let(:variant) { build(:variant, tax_category: tax_category) }
+
+      before do
+        tax_category.destroy
+      end
+
+      it 'returns the parent products tax_category' do
+        expect(variant.tax_category).to eq(variant.product.tax_category)
+      end
+    end
+
+    context 'when tax category is deleted also in product' do
+      let(:tax_category) { create(:tax_category) }
+      let!(:default_tax_category) { create(:tax_category, is_default: true) }
+      let(:product) { create(:product, tax_category: tax_category) }
+      let(:variant) { build(:variant, product: product, tax_category: tax_category) }
+
+      before do
+        tax_category.destroy
+        product.reload
+      end
+
+      context 'with default tax category' do
+        it 'returns the default tax category' do
+          expect(variant.tax_category).to eq(default_tax_category)
+        end
+      end
+
+      context 'without default tax category' do
+        before do
+          default_tax_category.destroy
+        end
+
+        it 'returns nil' do
+          expect(variant.tax_category).to eq(nil)
+        end
       end
     end
   end

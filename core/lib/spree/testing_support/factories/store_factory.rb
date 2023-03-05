@@ -12,6 +12,7 @@ FactoryBot.define do
     facebook               { 'spreecommerce' }
     twitter                { 'spreecommerce' }
     instagram              { 'spreecommerce' }
+    meta_description       { 'Sample store description.' }
 
     trait :with_favicon do
       transient do
@@ -20,7 +21,7 @@ FactoryBot.define do
       end
 
       favicon_image do
-        Rack::Test::UploadedFile.new(filepath, image_type)
+        create(:favicon_image, attachment: Rack::Test::UploadedFile.new(filepath, image_type))
       end
     end
   end

@@ -1112,6 +1112,7 @@ en:
     notice_messages:
       icon_removed: Image has been successfully removed
       prices_saved: Prices successfully saved
+      translations_saved: Translations successfully saved
       product_cloned: Product has been cloned
       product_deleted: Product has been deleted
       product_not_cloned: "Product could not be cloned. Reason: %{error}"
@@ -1122,6 +1123,7 @@ en:
     number: Number
     ok: OK
     on_hand: On Hand
+    only_active_products_can_be_added_to_cart: Draft and archived products cannot be added to cart, please mark the product as active before.
     open: Open
     open_all_adjustments: Open All Adjustments
     option_type: Option Type

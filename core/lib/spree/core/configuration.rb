@@ -65,6 +65,7 @@ module Spree
       preference :show_raw_product_description, :boolean, deprecated: true
       preference :tax_using_ship_address, :boolean, default: true
       preference :track_inventory_levels, :boolean, default: true # Determines whether to track on_hand values for variants / products.
+      preference :use_user_locale, :boolean, default: true
 
       # Store credits configurations
       preference :non_expiring_credit_types, :array, default: []
@@ -75,7 +76,8 @@ module Spree
 
       # searcher_class allows spree extension writers to provide their own Search class
       def searcher_class
-        @searcher_class ||= Spree::Core::Search::Base
+        ActiveSupport::Deprecation.warn('`Spree::Config.searcher_class` is deprecated and will be removed in Spree v5, please use `Spree.searcher_class` instead.')
+        @searcher_class ||= Spree.searcher_class
       end
 
       # Sets the path used for products, taxons and pages.

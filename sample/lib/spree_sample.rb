@@ -5,6 +5,7 @@ module SpreeSample
   class Engine < Rails::Engine
     engine_name 'spree_sample'
 
+    config.active_record.yaml_column_permitted_classes = [Symbol]
     # Needs to be here so we can access it inside the tests
     def self.load_samples
       Spree::Sample.load_sample('addresses')
@@ -31,6 +32,7 @@ module SpreeSample
       Spree::Sample.load_sample('reimbursements')
       Spree::Sample.load_sample('return_authorization_reasons')
       Spree::Sample.load_sample('stores')
+      Spree::Sample.load_sample('data_feed_settings')
 
       Spree::Sample.load_sample('cms_standard_pages')
       Spree::Sample.load_sample('cms_feature_pages')

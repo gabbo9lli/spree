@@ -2,7 +2,7 @@ openapi: 3.0.3
 servers:
   - url: 'https://demo.spreecommerce.org'
     description: demo
-  - url: 'http://localhost:3000'
+  - url: 'http://localhost:4000'
     description: localhost
 info:
   version: 2.0.0
@@ -57,6 +57,15 @@ paths:
                     email:
                       type: string
                       example: john@snow.org
+                    first_name:
+                      type: string
+                      example: John
+                    last_name:
+                      type: string
+                      example: Snow
+                    selected_locale:
+                      type: string
+                      example: 'en'
                     password:
                       type: string
                       example: spree123
@@ -66,7 +75,7 @@ paths:
                     public_metadata:
                       type: object
                       example:
-                        user_segment: 'supplier'
+                        user_segment: supplier
                       description: The public metadata for this User
                     private_metadata:
                       type: object
@@ -98,6 +107,15 @@ paths:
                     email:
                       type: string
                       example: john@snow.org
+                    first_name:
+                      type: string
+                      example: John
+                    last_name:
+                      type: string
+                      example: Snow
+                    selected_locale:
+                      type: string
+                      example: 'fr'
                     bill_address_id:
                       type: string
                       example: '1'
@@ -387,10 +405,10 @@ paths:
               properties:
                 public_metadata:
                   type: object
-                  description: 'The public metadata for the cart.'
+                  description: The public metadata for the cart.
                 private_metadata:
                   type: object
-                  description: 'The private metadata for the cart.'
+                  description: The private metadata for the cart.
       summary: Create a Cart
     delete:
       description: |-
@@ -425,6 +443,7 @@ paths:
       parameters:
         - $ref: '#/components/parameters/CartIncludeParam'
         - $ref: '#/components/parameters/SparseFieldsCart'
+        - $ref: '#/components/parameters/CartCurrencyParam'
       summary: Retrieve a Cart
   /api/v2/storefront/cart/add_item:
     post:
@@ -461,10 +480,10 @@ paths:
                   type: integer
                 public_metadata:
                   type: object
-                  description: 'The public metadata for the added item.'
+                  description: The public metadata for the added item.
                 private_metadata:
                   type: object
-                  description: 'The private metadata for the added item.'
+                  description: The private metadata for the added item.
                 options:
                   type: object
                   description: 'Additional custom options. Activate these by adding: `Spree::PermittedAttributes.line_item_attributes << :foo` in `config/initializers/spree.rb`'
@@ -936,7 +955,7 @@ paths:
                   description: ID of the selected Shipping Method
                 shipment_id:
                   type: string
-                  description: 'ID of the selected Shipment. If not supplied it will try to set selected shipping method for all shipments'
+                  description: ID of the selected Shipment. If not supplied it will try to set selected shipping method for all shipments
               required:
                 - shipping_method_id
             examples:
@@ -1900,7 +1919,7 @@ components:
         - id
         - type
         - attributes
-      x-internal: true
+      x-internal: false
     AddressPayload:
       example:
         firstname: John
@@ -1913,7 +1932,7 @@ components:
         state_name: MD
         country_iso: US
       type: object
-      x-internal: true
+      x-internal: false
       title: ''
       x-examples: {}
       description: ''
@@ -1960,7 +1979,7 @@ components:
       description: 'The Cart provides a central place to collect information about an order, including line items, adjustments, payments, addresses, and shipments. [Read more in Spree docs](https://dev-docs.spreecommerce.org/internals/orders)'
       type: object
       title: Cart
-      x-internal: true
+      x-internal: false
       properties:
         id:
           type: string
@@ -2168,7 +2187,7 @@ components:
         - attributes
         - relationships
     CartIncludes:
-      x-internal: true
+      x-internal: false
       title: Cart Includes
       anyOf:
         - $ref: '#/components/schemas/LineItem'
@@ -2184,7 +2203,7 @@ components:
       type: object
       title: CMS Page
       description: 'The CMS Page model contains page data for Standard pages, Feature Pages and Homepages.'
-      x-internal: true
+      x-internal: false
       properties:
         id:
           type: string
@@ -2237,7 +2256,7 @@ components:
         - attributes
         - relationships
     CmsPageIncludes:
-      x-internal: true
+      x-internal: false
       title: CMS Page Includes
       allOf:
         - $ref: '#/components/schemas/CmsSection'
@@ -2246,7 +2265,7 @@ components:
       type: object
       title: CMS Section
       description: The CMS Section model represents a single section belonging to a CMS Page. CMS Sections can link to other resources through the `linked_resource`.
-      x-internal: true
+      x-internal: false
       properties:
         id:
           type: string
@@ -2348,7 +2367,7 @@ components:
       title: Country
       description: 'Countries within Spree are used as a container for states. Countries can be zone members, and also link to an address. The difference between one country and another on an address record can determine which tax rates and shipping methods are used for the order.[Read more about Countries in Spree](https://dev-docs.spreecommerce.org/internals/addresses#countries)'
       type: object
-      x-internal: true
+      x-internal: false
       properties:
         id:
           type: string
@@ -2394,14 +2413,14 @@ components:
         - attributes
         - relationships
     CountryIncludes:
-      x-internal: true
+      x-internal: false
       title: Country Includes
       oneOf:
         - $ref: '#/components/schemas/State'
     CreditCard:
       title: Credit Card
       type: object
-      x-internal: true
+      x-internal: false
       properties:
         id:
           type: string
@@ -2440,26 +2459,26 @@ components:
               type: boolean
               example: true
               description: Defines if this is the default CC for a signed in user
-          relationships:
-            type: object
-            properties:
-              payment_method:
-                type: object
-                properties:
-                  data:
-                    $ref: '#/components/schemas/Relation'
+        relationships:
+          type: object
+          properties:
+            payment_method:
+              type: object
+              properties:
+                data:
+                  $ref: '#/components/schemas/Relation'
       required:
         - id
         - type
         - attributes
         - relationships
     CreditCardIncludes:
-      x-internal: true
+      x-internal: false
       title: Credit Card Includes
       allOf:
         - $ref: '#/components/schemas/PaymentMethod'
     Error:
-      x-internal: true
+      x-internal: false
       title: Error
       type: object
       properties:
@@ -2469,7 +2488,7 @@ components:
       type: object
       description: 'The Icon object contains a url attribute pointing to an Active Storage asset. '
       title: Icon
-      x-internal: true
+      x-internal: false
       properties:
         id:
           type: string
@@ -2513,15 +2532,15 @@ components:
         - type
         - attributes
       title: Image
-      x-internal: true
+      x-internal: false
     ImageStyle:
-      x-internal: true
+      x-internal: false
       title: Image Style
       type: object
       properties:
         url:
           type: string
-          example: 'http://localhost:3000/rails/active_storage/disk/eyJfcmFpbHMiOnsibWVzc2FnZSI6IkJBaEpJbWQyWVhKcFlXNTBjeTltWm1sMmRURlNORFpZWjJaSFpYUkdZMjk2WWsxM1RHWXZNVGs1T1RCak5XVmlNamN4TlRnd1pqVTBabUpqTWpCbFkyVXhZMlZpTTJFd05ERTJZemMzT0dKaE5tSTFNREkyT0dKaFpqa3paV1JtWTJWaE16aGxaQVk2QmtWVSIsImV4cCI6IjIwMTgtMDYtMjRUMTM6NTk6NTguOTY5WiIsInB1ciI6ImJsb2Jfa2V5In19--5e9ff358dc747f73754e332678c5762114ac6f3f/ror_jr_spaghetti.jpeg?content_type=image%2Fjpeg&disposition=inline%3B+filename%3D%22ror_jr_spaghetti.jpeg%22%3B+filename%2A%3DUTF-8%27%27ror_jr_spaghetti.jpeg'
+          example: 'http://localhost:4000/rails/active_storage/disk/eyJfcmFpbHMiOnsibWVzc2FnZSI6IkJBaEpJbWQyWVhKcFlXNTBjeTltWm1sMmRURlNORFpZWjJaSFpYUkdZMjk2WWsxM1RHWXZNVGs1T1RCak5XVmlNamN4TlRnd1pqVTBabUpqTWpCbFkyVXhZMlZpTTJFd05ERTJZemMzT0dKaE5tSTFNREkyT0dKaFpqa3paV1JtWTJWaE16aGxaQVk2QmtWVSIsImV4cCI6IjIwMTgtMDYtMjRUMTM6NTk6NTguOTY5WiIsInB1ciI6ImJsb2Jfa2V5In19--5e9ff358dc747f73754e332678c5762114ac6f3f/ror_jr_spaghetti.jpeg?content_type=image%2Fjpeg&disposition=inline%3B+filename%3D%22ror_jr_spaghetti.jpeg%22%3B+filename%2A%3DUTF-8%27%27ror_jr_spaghetti.jpeg'
           description: Absolute URL of the uploaded image in selected style (width/height)
         width:
           type: integer
@@ -2532,7 +2551,7 @@ components:
           example: 1080
           description: Actual height of image
     ListLinks:
-      x-internal: true
+      x-internal: false
       type: object
       title: Pagination Links
       properties:
@@ -2553,7 +2572,7 @@ components:
           description: URL to the first page of the listing
     ListMeta:
       type: object
-      x-internal: true
+      x-internal: false
       title: Pagination Meta
       properties:
         count:
@@ -2571,7 +2590,7 @@ components:
     LineItem:
       title: Line Item
       type: object
-      x-internal: true
+      x-internal: false
       properties:
         id:
           type: string
@@ -2655,7 +2674,7 @@ components:
               type: object
               example:
                 recommended_by_us: true
-              description: 'The public metadata for the Line Item.'
+              description: The public metadata for the Line Item.
         relationships:
           type: object
           properties:
@@ -2680,7 +2699,7 @@ components:
     Menu:
       type: object
       title: Menu
-      x-internal: true
+      x-internal: false
       properties:
         id:
           type: string
@@ -2721,7 +2740,7 @@ components:
     MenuItem:
       title: Menu Item
       type: object
-      x-internal: true
+      x-internal: false
       properties:
         id:
           type: string
@@ -2810,7 +2829,7 @@ components:
         - attributes
         - relationships
     MenuIncludes:
-      x-internal: true
+      x-internal: false
       title: Menu Includes
       anyOf:
         - $ref: '#/components/schemas/MenuItem'
@@ -2821,7 +2840,7 @@ components:
     OptionType:
       title: Option Type
       type: object
-      x-internal: true
+      x-internal: false
       properties:
         id:
           type: string
@@ -2849,7 +2868,7 @@ components:
       title: Payment
       type: object
       description: ''
-      x-internal: true
+      x-internal: false
       properties:
         id:
           type: string
@@ -2905,7 +2924,7 @@ components:
       title: Payment Method
       description: ''
       type: object
-      x-internal: true
+      x-internal: false
       properties:
         id:
           type: string
@@ -2935,7 +2954,7 @@ components:
     Product:
       type: object
       title: Product
-      x-internal: true
+      x-internal: false
       properties:
         id:
           type: string
@@ -3064,7 +3083,7 @@ components:
         - attributes
         - relationships
     ProductIncludes:
-      x-internal: true
+      x-internal: false
       title: Product Includes
       anyOf:
         - $ref: '#/components/schemas/OptionType'
@@ -3073,7 +3092,7 @@ components:
         - $ref: '#/components/schemas/Image'
         - $ref: '#/components/schemas/Taxon'
     StoreIncludes:
-      x-internal: true
+      x-internal: false
       title: Store Includes
       anyOf:
         - $ref: '#/components/schemas/Country'
@@ -3108,7 +3127,7 @@ components:
         - id
         - type
         - attributes
-      x-internal: true
+      x-internal: false
     Promotion:
       type: object
       title: Promotion
@@ -3141,7 +3160,7 @@ components:
         - id
         - type
         - attributes
-      x-internal: true
+      x-internal: false
     Relation:
       type: object
       nullable: true
@@ -3153,7 +3172,7 @@ components:
       required:
         - id
         - type
-      x-internal: true
+      x-internal: false
       description: ''
     State:
       type: object
@@ -3168,12 +3187,12 @@ components:
           type: string
           example: New York
           description: State name
-      x-internal: true
+      x-internal: false
     Store:
       type: object
-      description: 'Stores are the center of the Spree ecosystem. Each Spree installation can have multiple Stores. Each Store operates on a different domain or subdomain.'
+      description: Stores are the center of the Spree ecosystem. Each Spree installation can have multiple Stores. Each Store operates on a different domain or subdomain.
       title: Store
-      x-internal: true
+      x-internal: false
       properties:
         id:
           type: string
@@ -3214,19 +3233,19 @@ components:
               description: Indicates if the Store is the default one
             supported_currencies:
               type: string
-              example: EUR,USD,GBP
+              example: 'EUR,USD,GBP'
               description: All currencies supported by store
             facebook:
               type: string
-              example: https://www.facebook.com/mystorename
+              example: 'https://www.facebook.com/mystorename'
               description: URL of Facebook page
             twitter:
               type: string
-              example: https://twitter.com/mystorename
+              example: 'https://twitter.com/mystorename'
               description: URL of Twitter page
             instagram:
               type: string
-              example: https://instagram.com/mystorename
+              example: 'https://instagram.com/mystorename'
               description: URL of Instagram page
             default_locale:
               type: string
@@ -3234,7 +3253,7 @@ components:
               description: Default locale of the Store
             supported_locales:
               type: string
-              example: en,es,de
+              example: 'en,es,de'
               description: Supported locales of the Store
             customer_support_email:
               type: string
@@ -3246,7 +3265,7 @@ components:
               description: Description of the Store which is visible in the Footer
             address:
               type: string
-              example: 813 Howard Street, Oswego NY 13126, USA
+              example: '813 Howard Street, Oswego NY 13126, USA'
               description: Address of the Store which is visible in the Footer
             contact_phone:
               type: string
@@ -3254,7 +3273,7 @@ components:
               description: Contact phone number of the Store which is visible in the Footer
             favicon_path:
               type: string
-              example: '/assets/favicon.ico'
+              example: /assets/favicon.ico
         relationships:
           type: object
           properties:
@@ -3288,7 +3307,7 @@ components:
     Shipment:
       type: object
       title: Shipment
-      x-internal: true
+      x-internal: false
       properties:
         id:
           type: string
@@ -3358,7 +3377,7 @@ components:
         - attributes
         - relationships
     ShipmentIncludes:
-      x-internal: true
+      x-internal: false
       title: Shipment Includes
       allOf:
         - $ref: '#/components/schemas/ShippingRate'
@@ -3367,7 +3386,7 @@ components:
       type: object
       title: Shipping Rate
       description: ''
-      x-internal: true
+      x-internal: false
       properties:
         id:
           type: string
@@ -3421,7 +3440,7 @@ components:
     StockLocation:
       title: Stock Location
       type: object
-      x-internal: true
+      x-internal: false
       properties:
         id:
           type: string
@@ -3442,7 +3461,7 @@ components:
     Taxon:
       title: Taxon
       type: object
-      x-internal: true
+      x-internal: false
       properties:
         id:
           type: string
@@ -3573,9 +3592,9 @@ components:
         - type
         - attributes
       title: Taxon Image
-      x-internal: true
+      x-internal: false
     TaxonIncludes:
-      x-internal: true
+      x-internal: false
       title: Taxon Includes
       anyOf:
         - $ref: '#/components/schemas/Product'
@@ -3584,7 +3603,7 @@ components:
     Taxonomy:
       type: object
       title: Taxonomy
-      x-internal: true
+      x-internal: false
       properties:
         id:
           type: string
@@ -3609,7 +3628,7 @@ components:
       type: string
       format: date-time
       example: '2020-02-16T07:14:54.617Z'
-      x-internal: true
+      x-internal: false
       title: Time Stamp
       x-examples:
         example-1: '2020-02-16T07:14:54.617Z'
@@ -3617,7 +3636,7 @@ components:
       type: object
       title: User
       description: ' '
-      x-internal: true
+      x-internal: false
       properties:
         id:
           type: string
@@ -3631,6 +3650,15 @@ components:
             email:
               type: string
               example: spree@example.com
+            first_name:
+              type: string
+              example: John
+            last_name:
+              type: string
+              example: Doe
+            selected_locale:
+              type: string
+              example: 'fr'
             store_credits:
               type: number
               example: 150.75
@@ -3641,7 +3669,7 @@ components:
             public_metadata:
               type: object
               example:
-                user_segment: 'supplier'
+                user_segment: supplier
               description: The public metadata for this User
         relationships:
           type: object
@@ -3668,7 +3696,7 @@ components:
       description: 'Variant records track the individual variants of a Product. Variants are of two types: master variants and normal variants.'
       x-examples: {}
       type: object
-      x-internal: true
+      x-internal: false
       properties:
         id:
           type: string
@@ -3750,7 +3778,7 @@ components:
         - relationships
     WishedItem:
       type: object
-      x-internal: true
+      x-internal: false
       properties:
         id:
           type: string
@@ -3784,7 +3812,7 @@ components:
         - attributes
         - relationships
     WishedItemIncludes:
-      x-internal: true
+      x-internal: false
       title: Wished Item Includes
       allOf:
         - $ref: '#/components/schemas/Variant'
@@ -3792,7 +3820,7 @@ components:
       description: ''
       type: object
       title: Wishlist
-      x-internal: true
+      x-internal: false
       properties:
         id:
           type: string
@@ -3830,14 +3858,14 @@ components:
         - attributes
         - relationships
     WishlistIncludes:
-      x-internal: true
+      x-internal: false
       title: Wishlist Includes
       allOf:
         - $ref: '#/components/schemas/WishedItem'
     DigitalLink:
       title: Digital Link
       type: object
-      x-internal: true
+      x-internal: false
       properties:
         id:
           type: string
@@ -3960,6 +3988,13 @@ components:
         type: string
       description: 'Specify the related resources you would like to receive in the response body. [More Information](https://jsonapi.org/format/#fetching-includes).'
       example: 'line_items,variants,variants.images,billing_address,shipping_address,user,payments,shipments,promotions'
+    CartCurrencyParam:
+      name: currency
+      in: query
+      schema:
+        type: string
+      description: 'Must be specified when is different than current store default currency.'
+      example: 'USD'
     ProductIncludeParam:
       name: include
       in: query
@@ -4777,11 +4812,11 @@ components:
                   total_count: 1
                   total_pages: 1
                 links:
-                  self: 'http://localhost:3000/api/v2/storefront/account/orders'
-                  next: 'http://localhost:3000/api/v2/storefront/account/orders?page=1'
-                  prev: 'http://localhost:3000/api/v2/storefront/account/orders?page=1'
-                  last: 'http://localhost:3000/api/v2/storefront/account/orders?page=1'
-                  first: 'http://localhost:3000/api/v2/storefront/account/orders?page=1'
+                  self: 'http://localhost:4000/api/v2/storefront/account/orders'
+                  next: 'http://localhost:4000/api/v2/storefront/account/orders?page=1'
+                  prev: 'http://localhost:4000/api/v2/storefront/account/orders?page=1'
+                  last: 'http://localhost:4000/api/v2/storefront/account/orders?page=1'
+                  first: 'http://localhost:4000/api/v2/storefront/account/orders?page=1'
             Including all related objects:
               value:
                 data:
@@ -5052,11 +5087,11 @@ components:
                   total_count: 1
                   total_pages: 1
                 links:
-                  self: 'http://localhost:3000/api/v2/storefront/account/orders?include=line_items,variants,variants.images,billing_address,shipping_address,user,payments,shipments,promotions'
-                  next: 'http://localhost:3000/api/v2/storefront/account/orders?include=line_items%2Cvariants%2Cvariants.images%2Cbilling_address%2Cshipping_address%2Cuser%2Cpayments%2Cshipments%2Cpromotions&page=1'
-                  prev: 'http://localhost:3000/api/v2/storefront/account/orders?include=line_items%2Cvariants%2Cvariants.images%2Cbilling_address%2Cshipping_address%2Cuser%2Cpayments%2Cshipments%2Cpromotions&page=1'
-                  last: 'http://localhost:3000/api/v2/storefront/account/orders?include=line_items%2Cvariants%2Cvariants.images%2Cbilling_address%2Cshipping_address%2Cuser%2Cpayments%2Cshipments%2Cpromotions&page=1'
-                  first: 'http://localhost:3000/api/v2/storefront/account/orders?include=line_items%2Cvariants%2Cvariants.images%2Cbilling_address%2Cshipping_address%2Cuser%2Cpayments%2Cshipments%2Cpromotions&page=1'
+                  self: 'http://localhost:4000/api/v2/storefront/account/orders?include=line_items,variants,variants.images,billing_address,shipping_address,user,payments,shipments,promotions'
+                  next: 'http://localhost:4000/api/v2/storefront/account/orders?include=line_items%2Cvariants%2Cvariants.images%2Cbilling_address%2Cshipping_address%2Cuser%2Cpayments%2Cshipments%2Cpromotions&page=1'
+                  prev: 'http://localhost:4000/api/v2/storefront/account/orders?include=line_items%2Cvariants%2Cvariants.images%2Cbilling_address%2Cshipping_address%2Cuser%2Cpayments%2Cshipments%2Cpromotions&page=1'
+                  last: 'http://localhost:4000/api/v2/storefront/account/orders?include=line_items%2Cvariants%2Cvariants.images%2Cbilling_address%2Cshipping_address%2Cuser%2Cpayments%2Cshipments%2Cpromotions&page=1'
+                  first: 'http://localhost:4000/api/v2/storefront/account/orders?include=line_items%2Cvariants%2Cvariants.images%2Cbilling_address%2Cshipping_address%2Cuser%2Cpayments%2Cshipments%2Cpromotions&page=1'
     User:
       description: 200 Success - Returns the `user` object.
       content:
@@ -5081,10 +5116,13 @@ components:
                   type: user
                   attributes:
                     email: spree@example.com
+                    first_name: John
+                    last_name: Snow
+                    selected_locale: 'en'
                     store_credits: 0
                     completed_orders: 0
                     public_metadata:
-                      user_segment: 'supplier'
+                      user_segment: supplier
                   relationships:
                     default_billing_address:
                       data:
@@ -5224,11 +5262,11 @@ components:
                   total_count: 3
                   total_pages: 1
                 links:
-                  self: 'http://localhost:3000/api/v2/storefront/account/addresses'
-                  next: 'http://localhost:3000/api/v2/storefront/account/addresses?page=1'
-                  prev: 'http://localhost:3000/api/v2/storefront/account/addresses?page=1'
-                  last: 'http://localhost:3000/api/v2/storefront/account/addresses?page=1'
-                  first: 'http://localhost:3000/api/v2/storefront/account/addresses?page=1'
+                  self: 'http://localhost:4000/api/v2/storefront/account/addresses'
+                  next: 'http://localhost:4000/api/v2/storefront/account/addresses?page=1'
+                  prev: 'http://localhost:4000/api/v2/storefront/account/addresses?page=1'
+                  last: 'http://localhost:4000/api/v2/storefront/account/addresses?page=1'
+                  first: 'http://localhost:4000/api/v2/storefront/account/addresses?page=1'
     Address:
       description: 200 Success - Returns the `address` object.
       content:
@@ -5672,11 +5710,11 @@ components:
                   total_count: 6
                   total_pages: 1
                 links:
-                  self: 'http://localhost:3000/api/v2/storefront/cms_pages'
-                  next: 'http://localhost:3000/api/v2/storefront/cms_pages?page=1'
-                  prev: 'http://localhost:3000/api/v2/storefront/cms_pages?page=1'
-                  last: 'http://localhost:3000/api/v2/storefront/cms_pages?page=1'
-                  first: 'http://localhost:3000/api/v2/storefront/cms_pages?page=1'
+                  self: 'http://localhost:4000/api/v2/storefront/cms_pages'
+                  next: 'http://localhost:4000/api/v2/storefront/cms_pages?page=1'
+                  prev: 'http://localhost:4000/api/v2/storefront/cms_pages?page=1'
+                  last: 'http://localhost:4000/api/v2/storefront/cms_pages?page=1'
+                  first: 'http://localhost:4000/api/v2/storefront/cms_pages?page=1'
             CMS Pages with Included Sections:
               value:
                 data:
@@ -6171,11 +6209,11 @@ components:
                   total_count: 6
                   total_pages: 1
                 links:
-                  self: 'http://localhost:3000/api/v2/storefront/cms_pages?include=cms_sections'
-                  next: 'http://localhost:3000/api/v2/storefront/cms_pages?include=cms_sections&page=1'
-                  prev: 'http://localhost:3000/api/v2/storefront/cms_pages?include=cms_sections&page=1'
-                  last: 'http://localhost:3000/api/v2/storefront/cms_pages?include=cms_sections&page=1'
-                  first: 'http://localhost:3000/api/v2/storefront/cms_pages?include=cms_sections&page=1'
+                  self: 'http://localhost:4000/api/v2/storefront/cms_pages?include=cms_sections'
+                  next: 'http://localhost:4000/api/v2/storefront/cms_pages?include=cms_sections&page=1'
+                  prev: 'http://localhost:4000/api/v2/storefront/cms_pages?include=cms_sections&page=1'
+                  last: 'http://localhost:4000/api/v2/storefront/cms_pages?include=cms_sections&page=1'
+                  first: 'http://localhost:4000/api/v2/storefront/cms_pages?include=cms_sections&page=1'
     CreditCard:
       description: 200 Success - Returns the `credit_card` object.
       content:
@@ -6204,11 +6242,11 @@ components:
                     year: 2026
                     name: John Doe
                     default: true
-                    relationships:
-                      payment_method:
-                        data:
-                          id: '1'
-                          type: payment_method
+                  relationships:
+                    payment_method:
+                      data:
+                        id: '1'
+                        type: payment_method
                 included:
                   - id: '1'
                     type: payment_method
@@ -6253,11 +6291,11 @@ components:
                       year: 2026
                       name: John Doe
                       default: true
-                      relationships:
-                        payment_method:
-                          data:
-                            id: string
-                            type: string
+                    relationships:
+                      payment_method:
+                        data:
+                          id: string
+                          type: string
                   - id: '2'
                     type: credit_card
                     attributes:
@@ -6267,11 +6305,11 @@ components:
                       year: 2030
                       name: John Doe
                       default: false
-                      relationships:
-                        payment_method:
-                          data:
-                            id: string
-                            type: string
+                    relationships:
+                      payment_method:
+                        data:
+                          id: string
+                          type: string
                 included:
                   - id: '1'
                     type: payment_method
@@ -6285,11 +6323,11 @@ components:
                   total_count: 2
                   total_pages: 1
                 links:
-                  self: 'http://localhost:3000/api/v2/storefront/account/credit_cards'
-                  next: 'http://localhost:3000/api/v2/storefront/account/credit_cards?page=0'
-                  prev: 'http://localhost:3000/api/v2/storefront/account/credit_cards?page=1'
-                  last: 'http://localhost:3000/api/v2/storefront/account/credit_cards?page=0'
-                  first: 'http://localhost:3000/api/v2/storefront/account/credit_cards?page=1'
+                  self: 'http://localhost:4000/api/v2/storefront/account/credit_cards'
+                  next: 'http://localhost:4000/api/v2/storefront/account/credit_cards?page=0'
+                  prev: 'http://localhost:4000/api/v2/storefront/account/credit_cards?page=1'
+                  last: 'http://localhost:4000/api/v2/storefront/account/credit_cards?page=0'
+                  first: 'http://localhost:4000/api/v2/storefront/account/credit_cards?page=1'
     Product:
       description: 200 Success - Returns the `product` object.
       content:
@@ -8518,11 +8556,11 @@ components:
                           - value: Zeta
                             filter_param: zeta
                 links:
-                  self: 'http://localhost:3000/api/v2/storefront/products'
-                  next: 'http://localhost:3000/api/v2/storefront/products?page=2'
-                  prev: 'http://localhost:3000/api/v2/storefront/products?page=1'
-                  last: 'http://localhost:3000/api/v2/storefront/products?page=5'
-                  first: 'http://localhost:3000/api/v2/storefront/products?page=1'
+                  self: 'http://localhost:4000/api/v2/storefront/products'
+                  next: 'http://localhost:4000/api/v2/storefront/products?page=2'
+                  prev: 'http://localhost:4000/api/v2/storefront/products?page=1'
+                  last: 'http://localhost:4000/api/v2/storefront/products?page=5'
+                  first: 'http://localhost:4000/api/v2/storefront/products?page=1'
     Store:
       description: 200 Success - Returns the `store` object.
       content:
@@ -8552,28 +8590,28 @@ components:
                     seo_title: ''
                     default_currency: USD
                     default: true
-                    supported_currencies: EUR,GBP,USD
+                    supported_currencies: 'EUR,GBP,USD'
                     facebook: 'https://www.facebook.com/mystorename'
                     twitter: 'https://twitter.com/mystorename'
                     instagram: 'https://instagram.com/mystorename'
                     default_locale: en
-                    customer_support_email: 'support@mystore.com'
-                    description: 'Mystore has been selling luxury clothing for more than 20 years and has 15 stores currently.'
+                    customer_support_email: support@mystore.com
+                    description: Mystore has been selling luxury clothing for more than 20 years and has 15 stores currently.
                     address: '813 Howard Street, Oswego NY 13126, USA'
                     contact_phone: '+123456789'
                     supported_locales: en
-                    favicon_path: '/assets/favicon.ico'
+                    favicon_path: /assets/favicon.ico
                   relationships:
                     menus:
                       data:
-                      - id: '10'
-                        type: menu
-                      - id: '11'
-                        type: menu
+                        - id: '10'
+                          type: menu
+                        - id: '11'
+                          type: menu
                     cms_pages:
                       data:
-                      - id: '5'
-                        type: cms_page
+                        - id: '5'
+                          type: cms_page
                     default_country:
                       data:
                         id: '2'
@@ -8591,28 +8629,28 @@ components:
                     seo_title: ''
                     default_currency: USD
                     default: true
-                    supported_currencies: EUR,GBP,USD
+                    supported_currencies: 'EUR,GBP,USD'
                     facebook: 'https://www.facebook.com/mystorename'
                     twitter: 'https://twitter.com/mystorename'
                     instagram: 'https://instagram.com/mystorename'
                     default_locale: en
-                    customer_support_email: 'support@mystore.com'
-                    description: 'Mystore has been selling luxury clothing for more than 20 years and has 15 stores currently.'
+                    customer_support_email: support@mystore.com
+                    description: Mystore has been selling luxury clothing for more than 20 years and has 15 stores currently.
                     address: '813 Howard Street, Oswego NY 13126, USA'
                     contact_phone: '+123456789'
                     supported_locales: en
-                    favicon_path: '/assets/favicon.ico'
+                    favicon_path: /assets/favicon.ico
                   relationships:
                     menus:
                       data:
-                      - id: '10'
-                        type: menu
-                      - id: '11'
-                        type: menu
+                        - id: '10'
+                          type: menu
+                        - id: '11'
+                          type: menu
                     cms_pages:
                       data:
-                      - id: '5'
-                        type: cms_page
+                        - id: '5'
+                          type: cms_page
                     default_country:
                       data:
                         id: '2'
@@ -8635,12 +8673,12 @@ components:
                     type: cms_page
                     attributes:
                       title: Returns Policy
-                      content:
+                      content: null
                       locale: en
                       meta_description: ''
                       meta_title: ''
                       slug: returns-policy
-                      type: Spree::Cms::Pages::StandardPage
+                      type: 'Spree::Cms::Pages::StandardPage'
                     relationships:
                       cms_sections:
                         data: []
@@ -8653,10 +8691,10 @@ components:
                     relationships:
                       menu_items:
                         data:
-                        - id: '1'
-                          type: menu_item
-                        - id: '2'
-                          type: menu_item
+                          - id: '1'
+                            type: menu_item
+                          - id: '2'
+                            type: menu_item
     Taxon:
       description: 200 Success - Returns the `taxon` object.
       content:
@@ -11878,11 +11916,11 @@ components:
                   total_count: 26
                   total_pages: 2
                 links:
-                  self: 'http://localhost:3000/api/v2/storefront/taxons'
-                  next: 'http://localhost:3000/api/v2/storefront/taxons?page=2'
-                  prev: 'http://localhost:3000/api/v2/storefront/taxons?page=1'
-                  last: 'http://localhost:3000/api/v2/storefront/taxons?page=2'
-                  first: 'http://localhost:3000/api/v2/storefront/taxons?page=1'
+                  self: 'http://localhost:4000/api/v2/storefront/taxons'
+                  next: 'http://localhost:4000/api/v2/storefront/taxons?page=2'
+                  prev: 'http://localhost:4000/api/v2/storefront/taxons?page=1'
+                  last: 'http://localhost:4000/api/v2/storefront/taxons?page=2'
+                  first: 'http://localhost:4000/api/v2/storefront/taxons?page=1'
     Country:
       description: 200 Success - Returns the `country` object.
       content:
@@ -15184,13 +15222,13 @@ components:
                   total_count: 240
                   total_pages: 1
                 links:
-                  self: 'http://localhost:3000/api/v2/storefront/countries'
-                  next: 'http://localhost:3000/api/v2/storefront/countries?page=1&per_page=240'
-                  prev: 'http://localhost:3000/api/v2/storefront/countries?page=1&per_page=240'
-                  last: 'http://localhost:3000/api/v2/storefront/countries?page=1&per_page=240'
-                  first: 'http://localhost:3000/api/v2/storefront/countries?page=1&per_page=240'
+                  self: 'http://localhost:4000/api/v2/storefront/countries'
+                  next: 'http://localhost:4000/api/v2/storefront/countries?page=1&per_page=240'
+                  prev: 'http://localhost:4000/api/v2/storefront/countries?page=1&per_page=240'
+                  last: 'http://localhost:4000/api/v2/storefront/countries?page=1&per_page=240'
+                  first: 'http://localhost:4000/api/v2/storefront/countries?page=1&per_page=240'
     Shipment:
-      description: '200 Success - Returns an array containing sevral `shipment` objects, along with the included array containing all available `shipping_rate` and `stock_location` objects. '
+      description: '200 Success - Returns an array containing several `shipment` objects, along with the included array containing all available `shipping_rate` and `stock_location` objects. '
       content:
         application/vnd.api+json:
           schema:
@@ -16191,11 +16229,11 @@ components:
                   total_count: 2
                   total_pages: 1
                 links:
-                  self: 'http://localhost:3000/api/v2/storefront/menus'
-                  next: 'http://localhost:3000/api/v2/storefront/menus?page=1'
-                  prev: 'http://localhost:3000/api/v2/storefront/menus?page=1'
-                  last: 'http://localhost:3000/api/v2/storefront/menus?page=1'
-                  first: 'http://localhost:3000/api/v2/storefront/menus?page=1'
+                  self: 'http://localhost:4000/api/v2/storefront/menus'
+                  next: 'http://localhost:4000/api/v2/storefront/menus?page=1'
+                  prev: 'http://localhost:4000/api/v2/storefront/menus?page=1'
+                  last: 'http://localhost:4000/api/v2/storefront/menus?page=1'
+                  first: 'http://localhost:4000/api/v2/storefront/menus?page=1'
     Wishlist:
       description: 200 Success - Returns the `wishlist` object.
       content:
@@ -16333,11 +16371,11 @@ components:
                   total_count: 3
                   total_pages: 1
                 links:
-                  self: 'http://localhost:3000/api/v2/storefront/wishlists?is_variant_included=150'
-                  next: 'http://localhost:3000/api/v2/storefront/wishlists?page=1'
-                  prev: 'http://localhost:3000/api/v2/storefront/wishlists?page=1'
-                  last: 'http://localhost:3000/api/v2/storefront/wishlists?page=1'
-                  first: 'http://localhost:3000/api/v2/storefront/wishlists?page=1'
+                  self: 'http://localhost:4000/api/v2/storefront/wishlists?is_variant_included=150'
+                  next: 'http://localhost:4000/api/v2/storefront/wishlists?page=1'
+                  prev: 'http://localhost:4000/api/v2/storefront/wishlists?page=1'
+                  last: 'http://localhost:4000/api/v2/storefront/wishlists?page=1'
+                  first: 'http://localhost:4000/api/v2/storefront/wishlists?page=1'
     WishedItem:
       description: 200 Success - Returns an array of `wished_item` objects.
       content:
@@ -16470,6 +16508,7 @@ tags:
   - name: Menus
   - name: Order Status
   - name: Products
+  - name: Stores
   - name: Taxons
   - name: Wishlists
   - name: Wishlists / Wished Items

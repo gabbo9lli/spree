@@ -1,10 +1,22 @@
 module Spree
   class Store < Spree::Base
+    include TranslatableResource
     if defined?(Spree::Webhooks)
       include Spree::Webhooks::HasWebhooks
     end
     if defined?(Spree::Security::Stores)
       include Spree::Security::Stores
+    end
+
+    TRANSLATABLE_FIELDS = %i[name meta_description meta_keywords seo_title facebook
+                             twitter instagram customer_support_email description
+                             address contact_phone new_order_notifications_email].freeze
+    translates(*TRANSLATABLE_FIELDS)
+
+    self::Translation.class_eval do
+      acts_as_paranoid
+      # deleted translation values still need to be accessible - remove deleted_at scope
+      default_scope { unscope(where: :deleted_at) }
     end
 
     typed_store :settings, coder: ActiveRecord::TypedStore::IdentityCoder do |s|
@@ -17,9 +29,6 @@ module Spree
     end
 
     attr_accessor :skip_validate_not_last
-
-    MAILER_LOGO_CONTENT_TYPES = ['image/png', 'image/jpg', 'image/jpeg'].freeze
-    FAVICON_CONTENT_TYPES = ['image/png', 'image/x-icon', 'image/vnd.microsoft.icon'].freeze
 
     acts_as_paranoid
 
@@ -58,6 +67,9 @@ module Spree
 
     has_many :wishlists, class_name: 'Spree::Wishlist'
 
+    has_many :data_feed_settings, class_name: 'Spree::DataFeedSetting', foreign_key: 'spree_store_id'
+    accepts_nested_attributes_for :data_feed_settings, update_only: true
+
     belongs_to :default_country, class_name: 'Spree::Country'
     belongs_to :checkout_zone, class_name: 'Spree::Zone'
 
@@ -67,7 +79,7 @@ module Spree
 
     validates :digital_asset_authorized_clicks, numericality: { only_integer: true, greater_than: 0 }
     validates :digital_asset_authorized_days, numericality: { only_integer: true, greater_than: 0 }
-    validates :code, uniqueness: { conditions: -> { with_deleted } }
+    validates :code, uniqueness: { case_sensitive: false, conditions: -> { with_deleted } }
     validates :mail_from_address, email: { allow_blank: false }
 
     # FIXME: we should remove this condition in v5
@@ -80,28 +92,14 @@ module Spree
 
     default_scope { order(created_at: :asc) }
 
-    if Spree.public_storage_service_name
-      has_one_attached :logo, service: Spree.public_storage_service_name
-    else
-      has_one_attached :logo
-    end
-    if Spree.public_storage_service_name
-      has_one_attached :mailer_logo, service: Spree.public_storage_service_name
-    else
-      has_one_attached :mailer_logo
-    end
-    if Spree.public_storage_service_name
-      has_one_attached :favicon_image, service: Spree.public_storage_service_name
-    else
-      has_one_attached :favicon_image
-    end
+    has_one :logo, class_name: 'Spree::StoreLogo', dependent: :destroy, as: :viewable
+    accepts_nested_attributes_for :logo, reject_if: :all_blank
 
+    has_one :mailer_logo, class_name: 'Spree::StoreMailerLogo', dependent: :destroy, as: :viewable
+    accepts_nested_attributes_for :mailer_logo, reject_if: :all_blank
 
-    validates :mailer_logo, content_type: MAILER_LOGO_CONTENT_TYPES
-    validates :favicon_image, content_type: FAVICON_CONTENT_TYPES,
-                              dimension: { max: 256..256 },
-                              aspect_ratio: :square,
-                              size: { less_than_or_equal_to: 1.megabyte }
+    has_one :favicon_image, class_name: 'Spree::StoreFaviconImage', dependent: :destroy, as: :viewable
+    accepts_nested_attributes_for :favicon_image, reject_if: :all_blank
 
     before_save :ensure_default_exists_and_is_unique
     before_save :ensure_supported_currencies, :ensure_supported_locales, :ensure_default_country
@@ -126,7 +124,12 @@ module Spree
     # this behaviour is very buggy and unpredictable
     def self.default
       Rails.cache.fetch('default_store') do
-        where(default: true).first_or_initialize
+        # workaround for Mobility bug with first_or_initialize
+        if where(default: true).any?
+          where(default: true).first
+        else
+          new(default: true)
+        end
       end
     end
 
@@ -198,9 +201,9 @@ module Spree
     end
 
     def favicon
-      return unless favicon_image.attached?
+      return unless favicon_image&.attachment&.attached?
 
-      favicon_image.variant(resize_to_limit: [32, 32])
+      favicon_image.attachment.variant(resize_to_limit: [32, 32])
     end
 
     def can_be_deleted?

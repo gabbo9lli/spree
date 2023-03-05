@@ -45,7 +45,7 @@ Gem::Specification.new do |s|
   s.add_dependency 'money', '~> 6.13'
   s.add_dependency 'monetize', '~> 1.9'
   s.add_dependency 'paranoia', '~> 2.4'
-  s.add_dependency 'ransack', '~> 2.3'
+  s.add_dependency 'ransack', '>= 2.3', '< 3.0'
   s.add_dependency 'rexml'
   s.add_dependency 'state_machines-activerecord', '~> 0.6'
   s.add_dependency 'state_machines-activemodel', '~> 0.7'
@@ -54,4 +54,7 @@ Gem::Specification.new do |s|
   s.add_dependency 'image_processing', '~> 1.2'
   s.add_dependency 'active_storage_validations', '~> 0.9', '<= 0.9.5'
   s.add_dependency 'activerecord-typedstore'
+  s.add_dependency 'mobility', '~> 1.2.9'
+  s.add_dependency 'mobility-ransack', '~> 1.2.1'
+  s.add_dependency 'friendly_id-mobility', '~> 1.0.4'
 end

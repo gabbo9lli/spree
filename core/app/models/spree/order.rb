@@ -24,7 +24,7 @@ module Spree
     include NumberAsParam
     include SingleStoreResource
     include MemoizedData
-    include Metadata
+    include Spree::Metadata
     if defined?(Spree::Webhooks)
       include Spree::Webhooks::HasWebhooks
     end
@@ -86,7 +86,7 @@ module Spree
     attribute :state_machine_resumed, :boolean
 
     if Spree.user_class
-      belongs_to :user, class_name: Spree.user_class.to_s, optional: true
+      belongs_to :user, class_name: "::#{Spree.user_class}", optional: true
     else
       belongs_to :user, optional: true
     end
@@ -155,7 +155,7 @@ module Spree
 
     before_create :create_token
     before_create :link_by_email
-    before_update :homogenize_line_item_currencies, if: :currency_changed?
+    before_update :ensure_updated_shipments, :homogenize_line_item_currencies, if: :currency_changed?
 
     with_options presence: true do
       # we want to have this case_sentive: true as changing it to false causes all SQL to use LOWER(slug)

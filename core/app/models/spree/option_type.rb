@@ -2,11 +2,16 @@ module Spree
   class OptionType < Spree::Base
     include UniqueName
     include Metadata
+    include TranslatableResource
     if defined?(Spree::Webhooks)
       include Spree::Webhooks::HasWebhooks
     end
 
+    TRANSLATABLE_FIELDS = %i[name presentation].freeze
+    translates(*TRANSLATABLE_FIELDS)
+
     acts_as_list
+    auto_strip_attributes :name, :presentation
 
     with_options dependent: :destroy, inverse_of: :option_type do
       has_many :option_values, -> { order(:position) }

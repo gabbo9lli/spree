@@ -23,6 +23,7 @@ module Spree
     extend FriendlyId
     include ProductScopes
     include MultiStoreResource
+    include TranslatableResource
     include MemoizedData
     include Metadata
     if defined?(Spree::Webhooks)
@@ -32,13 +33,22 @@ module Spree
       include Spree::VendorConcern
     end
 
-    MEMOIZED_METHODS = %w(total_on_hand taxonomy_ids taxon_and_ancestors category
+    MEMOIZED_METHODS = %w[total_on_hand taxonomy_ids taxon_and_ancestors category
                           default_variant_id tax_category default_variant
-                          purchasable? in_stock? backorderable?)
+                          purchasable? in_stock? backorderable?]
 
-    friendly_id :slug_candidates, use: :history
+    TRANSLATABLE_FIELDS = %i[name description slug meta_description meta_keywords meta_title].freeze
+    translates(*TRANSLATABLE_FIELDS)
 
+    self::Translation.class_eval do
+      acts_as_paranoid
+      # deleted translation values also need to be accessible for index views listing deleted resources
+      default_scope { unscope(where: :deleted_at) }
+    end
+
+    friendly_id :slug_candidates, use: [:history, :mobility]
     acts_as_paranoid
+    auto_strip_attributes :name
 
     # we need to have this callback before any dependent: :destroy associations
     # https://github.com/rails/rails/issues/3458
@@ -139,7 +149,7 @@ module Spree
     self.whitelisted_ransackable_scopes = %w[not_discontinued search_by_name in_taxon price_between]
 
     [
-      :sku, :price, :currency, :weight, :height, :width, :depth, :is_master,
+      :sku, :barcode, :price, :currency, :weight, :height, :width, :depth, :is_master,
       :cost_currency, :price_in, :amount_in, :cost_price, :compare_at_price, :compare_at_amount_in
     ].each do |method_name|
       delegate method_name, :"#{method_name}=", to: :find_or_build_master
@@ -149,6 +159,23 @@ module Spree
              :display_compare_at_price, :images, to: :find_or_build_master
 
     alias master_images images
+
+    state_machine :status, initial: :draft do
+      event :activate do
+        transition to: :active
+      end
+      after_transition to: :active, do: :after_activate
+
+      event :archive do
+        transition to: :archived
+      end
+      after_transition to: :archived, do: :after_archive
+
+      event :draft do
+        transition to: :draft
+      end
+      after_transition to: :draft, do: :after_draft
+    end
 
     # Can't use short form block syntax due to https://github.com/Netflix/fast_jsonapi/issues/259
     def purchasable?
@@ -234,7 +261,7 @@ module Spree
     # deleted products and products with status different than active
     # are not available
     def available?
-      status == 'active' && !deleted?
+      active? && !deleted?
     end
 
     def discontinue!
@@ -288,14 +315,26 @@ module Spree
     end
 
     def property(property_name)
-      product_properties.joins(:property).find_by(spree_properties: { name: property_name }).try(:value)
+      product_properties.joins(:property).
+        join_translation_table(Property).
+        find_by(Property.translation_table_alias => { name: property_name }).try(:value)
     end
 
     def set_property(property_name, property_value, property_presentation = property_name)
       ApplicationRecord.transaction do
-        # Works around spree_i18n #301
-        property = Property.create_with(presentation: property_presentation).find_or_create_by(name: property_name)
-        product_property = ProductProperty.where(product: self, property: property).first_or_initialize
+        # Manual first_or_create to work around Mobility bug
+        property = if Property.where(name: property_name).exists?
+                     Property.where(name: property_name).first
+                   else
+                     Property.create(name: property_name, presentation: property_presentation)
+                   end
+
+        product_property = if ProductProperty.where(product: self, property: property).exists?
+                             ProductProperty.where(product: self, property: property).first
+                           else
+                             ProductProperty.create(product: self, property: property)
+                           end
+
         product_property.value = property_value
         product_property.save!
       end
@@ -319,11 +358,16 @@ module Spree
     end
 
     def brand
-      @brand ||= taxons.joins(:taxonomy).find_by(spree_taxonomies: { name: Spree.t(:taxonomy_brands_name) })
+      @brand ||= taxons.joins(:taxonomy).
+                 join_translation_table(Taxonomy).
+                 find_by(Taxonomy.translation_table_alias => { name: Spree.t(:taxonomy_brands_name) })
     end
 
     def category
-      @category ||= taxons.joins(:taxonomy).order(depth: :desc).find_by(spree_taxonomies: { name: Spree.t(:taxonomy_categories_name) })
+      @category ||= taxons.joins(:taxonomy).
+                    join_translation_table(Taxonomy).
+                    order(depth: :desc).
+                    find_by(Taxonomy.translation_table_alias => { name: Spree.t(:taxonomy_categories_name) })
     end
 
     def taxons_for_store(store)
@@ -341,7 +385,7 @@ module Spree
     end
 
     def digital?
-      shipping_category == I18n.t('spree.seed.shipping.categories.digital')
+      shipping_category&.name == I18n.t('spree.seed.shipping.categories.digital')
     end
 
     private
@@ -397,7 +441,11 @@ module Spree
 
     def punch_slug
       # punch slug with date prefix to allow reuse of original
-      update_column :slug, "#{Time.current.to_i}_#{slug}"[0..254] unless frozen?
+      return if frozen?
+
+      translations.with_deleted.each do |t|
+        t.update_column :slug, "#{Time.current.to_i}_#{t.slug}"[0..254]
+      end
     end
 
     def update_slug_history
@@ -513,6 +561,18 @@ module Spree
 
     def downcase_slug
       slug&.downcase!
+    end
+
+    def after_activate
+      # this method is prepended in api/ to queue Webhooks requests
+    end
+
+    def after_archive
+      # this method is prepended in api/ to queue Webhooks requests
+    end
+
+    def after_draft
+      # this method is prepended in api/ to queue Webhooks requests
     end
   end
 end

@@ -4,8 +4,6 @@ module Spree
       def initialize(scope:, params:, current_currency: nil)
         @scope = scope
 
-        ActiveSupport::Deprecation.warn('`current_currency` param is deprecated and will be removed in Spree 5') if current_currency
-
         if current_currency.present?
           ActiveSupport::Deprecation.warn(<<-DEPRECATION, caller)
             `current_currency` param is deprecated and will be removed in Spree 5.
@@ -148,7 +146,10 @@ module Spree
       def by_name(products)
         return products unless name?
 
-        products.like_any([:name], [name])
+        product_name = name
+
+        # i18n mobility scope doesn't automatically get set for query blocks (Mobility issue #599) - set it explicitly
+        products.i18n { name.matches("%#{product_name}%") }
       end
 
       def by_options(products)
@@ -185,7 +186,7 @@ module Spree
 
           next if values.empty?
 
-          ids = products.with_property_values(property_filter_param, values).ids
+          ids = scope.unscope(:order, :includes).with_property_values(property_filter_param, values).ids
           product_ids = index == 0 ? ids : product_ids & ids
           index += 1
         end
@@ -211,21 +212,19 @@ module Spree
             products
           end
         when 'name-a-z'
-          products.order(name: :asc)
+          # workaround for Mobility issue #596 - explicitly select fields to avoid error when selecting distinct
+          products.i18n.
+            select("#{Product.table_name}.*").select(:name).order(name: :asc)
         when 'name-z-a'
-          products.order(name: :desc)
+          # workaround for Mobility issue #596
+          products.i18n.
+            select("#{Product.table_name}.*").select(:name).order(name: :desc)
         when 'newest-first'
           products.order(available_on: :desc)
         when 'price-high-to-low'
-          products.
-            select("#{Product.table_name}.*, #{Spree::Price.table_name}.amount").
-            reorder('').
-            send(:descend_by_master_price)
+          order_by_price(products, :descend_by_master_price)
         when 'price-low-to-high'
-          products.
-            select("#{Product.table_name}.*, #{Spree::Price.table_name}.amount").
-            reorder('').
-            send(:ascend_by_master_price)
+          order_by_price(products, :ascend_by_master_price)
         end
       end
 
@@ -266,6 +265,13 @@ module Spree
 
         taxons = store.taxons.where(id: taxons_ids.to_s.split(','))
         taxons.map(&:cached_self_and_descendants_ids).flatten.compact.uniq.map(&:to_s)
+      end
+
+      def order_by_price(scope, order_type)
+        scope.
+          select("#{Product.table_name}.*, #{Spree::Price.table_name}.amount").
+          reorder('').
+          send(order_type)
       end
     end
   end

@@ -249,7 +249,8 @@ module Spree
     end
 
     def selected_shipping_rate_id=(id)
-      shipping_rates.update_all(selected: false)
+      # Explicitly updates the timestamp in order to bust cache dependent on "updated_at"
+      shipping_rates.update_all(selected: false, updated_at: Time.current)
       shipping_rates.update(id, selected: true)
       save!
     end

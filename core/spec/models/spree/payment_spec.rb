@@ -50,7 +50,7 @@ describe Spree::Payment, type: :model do
   it_behaves_like 'metadata'
 
   describe 'Constants' do
-    it { expect(Spree::Payment::INVALID_STATES).to eq(%w(failed invalid)) }
+    it { expect(Spree::Payment::INVALID_STATES).to eq(%w(failed invalid void)) }
   end
 
   describe 'scopes' do
@@ -855,12 +855,10 @@ describe Spree::Payment, type: :model do
     context 'when the locale uses a coma as a decimal separator' do
       before do
         I18n.backend.store_translations(:fr, number: { currency: { format: { delimiter: ' ', separator: ',' } } })
-        I18n.locale = :fr
-        subject.amount = amount
-      end
+        allow(I18n).to receive(:locale).and_return(:fr)
+        allow(I18n.config).to receive(:locale).and_return(:fr)
 
-      after do
-        I18n.locale = I18n.default_locale
+        subject.amount = amount
       end
 
       context 'amount is a decimal' do

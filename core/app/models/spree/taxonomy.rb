@@ -1,9 +1,13 @@
 module Spree
   class Taxonomy < Spree::Base
+    include TranslatableResource
     include Metadata
     if defined?(Spree::Webhooks)
       include Spree::Webhooks::HasWebhooks
     end
+
+    TRANSLATABLE_FIELDS = %i[name].freeze
+    translates(*TRANSLATABLE_FIELDS)
 
     acts_as_list
 
@@ -15,7 +19,7 @@ module Spree
     belongs_to :store, class_name: 'Spree::Store'
 
     after_create :set_root
-    after_save :set_root_taxon_name
+    after_update :set_root_taxon_name
 
     default_scope { order("#{table_name}.position, #{table_name}.created_at") }
 

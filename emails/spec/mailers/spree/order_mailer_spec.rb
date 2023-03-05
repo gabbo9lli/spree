@@ -5,7 +5,7 @@ describe Spree::OrderMailer, type: :mailer do
   include EmailSpec::Helpers
   include EmailSpec::Matchers
 
-  let(:first_store) { create(:store, name: 'First Store') }
+  let(:first_store) { create(:store, name: 'First Store', default: true) }
   let(:second_store) { create(:store, name: 'Second Store', url: 'other.example.com') }
 
   let(:order) do
@@ -172,7 +172,6 @@ describe Spree::OrderMailer, type: :mailer do
         pt_br_cancel_mail = { spree: { order_mailer: { cancel_email: { order_summary_canceled: 'Resumo da Pedido [CANCELADA]' } } } }
         I18n.backend.store_translations :'pt-BR', pt_br_confirm_mail
         I18n.backend.store_translations :'pt-BR', pt_br_cancel_mail
-        first_store.update(default_locale: 'pt-BR')
       end
 
       after do
@@ -196,7 +195,14 @@ describe Spree::OrderMailer, type: :mailer do
       end
 
       context 'via I18n' do
-        before { I18n.locale = :'pt-BR' }
+        before do
+          I18n.locale = :'pt-BR'
+          first_store.update(default_locale: 'pt-BR')
+        end
+
+        after do
+          I18n.locale = :en
+        end
 
         it_behaves_like 'translates emails'
       end

@@ -38,13 +38,12 @@ module Spree
       opts[:skip_rc] = true
       opts[:skip_spring] = true
       opts[:skip_test] = true
-      opts[:skip_yarn] = true
-      opts[:skip_javascript] = true
       opts[:skip_bootsnap] = true
 
       puts 'Generating dummy Rails application...'
       invoke Rails::Generators::AppGenerator,
         [File.expand_path(dummy_path, destination_root)], opts
+      inject_yaml_permitted_classes
     end
 
     def test_dummy_config
@@ -58,6 +57,10 @@ module Spree
       template 'rails/test.rb', "#{dummy_path}/config/environments/test.rb", force: true
       template 'rails/script/rails', "#{dummy_path}/spec/dummy/script/rails", force: true
       template 'initializers/devise.rb', "#{dummy_path}/config/initializers/devise.rb", force: true
+
+      if lib_name == 'spree/backend'
+        template 'package.json', "#{dummy_path}/package.json", force: true
+      end
     end
 
     def test_dummy_inject_extension_requirements
@@ -112,6 +115,14 @@ rescue LoadError
   # #{requirement} is not available.
 end
       ], before: /require '#{@lib_name}'/, verbose: true
+    end
+
+    def inject_yaml_permitted_classes
+      inside dummy_path do
+        inject_into_file 'config/application.rb', %Q[
+    config.active_record.yaml_column_permitted_classes = [Symbol, BigDecimal, ActiveSupport::HashWithIndifferentAccess]
+        ], after: /config\.load_defaults.*$/, verbose: true
+      end
     end
 
     def dummy_path

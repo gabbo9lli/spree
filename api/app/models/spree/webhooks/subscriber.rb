@@ -1,10 +1,15 @@
 module Spree
   module Webhooks
     class Subscriber < Spree::Webhooks::Base
+      if defined?(Spree::VendorConcern)
+        include Spree::VendorConcern
+      end
+
+      has_secure_token :secret_key
+
       has_many :events, inverse_of: :subscriber
 
       validates :url, 'spree/url': true, presence: true
-
       validate :check_uri_path
 
       self.whitelisted_ransackable_attributes = %w[active subscriptions url]
