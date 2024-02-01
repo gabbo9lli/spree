@@ -6,6 +6,7 @@ Spree.ready(function($) {
   var body = $('body')
 
   var onQuantityDecreaseClick = function(event) {
+    console.log("DECREMENTA!!");
     var $quantitySelect = $(event.currentTarget).closest(quantitySelectSelector)
     var $quantitySelectValue = $quantitySelect.find(quantitySelectValueSelector)
     var min =
@@ -21,6 +22,7 @@ Spree.ready(function($) {
     }
   }
   var onQuantityIncreaseClick = function(event) {
+    console.log("INCREMENTA!!");
     var $quantitySelect = $(event.currentTarget).closest(quantitySelectSelector)
     var $quantitySelectValue = $quantitySelect.find(quantitySelectValueSelector)
     var max =
