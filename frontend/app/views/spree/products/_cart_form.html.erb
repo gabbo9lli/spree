@@ -27,13 +27,17 @@
   <div id="inside-product-cart-form" data-hook="inside_product_cart_form">
     <% if is_product_available_in_currency %>
       <div id="product-price" class="mb-2 text-center text-md-left add-to-cart-form-price" data-hook="product_price">
+      <% if spree_current_user %>
         <% if should_display_compare_at_price?(default_variant) %>
           <span class="compare-at-price mr-3"><%= display_compare_at_price(default_variant) %></span>
         <% end %>
         <span class="price selling" content="<%= @product_price.to_d %>">
-          1234
+          <%= display_price(default_variant) %>
         </span>
         <span content="<%= current_currency %>"></span>
+      <% else %>
+        <div class="mb-2 text-center text-md-left add-to-cart-form-price">Per favore eseguire login per vedere il prezzo</div>
+      <% end %>
       </div>
     <% end %>
 

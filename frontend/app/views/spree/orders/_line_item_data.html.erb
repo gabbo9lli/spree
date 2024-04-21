@@ -3,10 +3,13 @@
 <% elsif view == "desktop" %>
   <% additional_classes = "d-none d-lg-table-cell" %>
 <% end %>
-
-<div class="shopping-cart-item-price <%= additional_classes %>" data-hook="cart_item_price">
-  <%= line_item.single_money.to_html %>
-</div>
+<% if spree_current_user %>
+  <div class="shopping-cart-item-price <%= additional_classes %>" data-hook="cart_item_price">
+    <%= line_item.single_money.to_html %>
+  </div>
+<% else %>
+  <div class="shopping-cart-item-price <%= additional_classes %>" data-hook="cart_item_price"">Per favore eseguire login per vedere il prezzo</div>
+<% end %>
 <div class="shopping-cart-item-quantity <%= additional_classes %>" data-hook="cart_item_quantity">
   <div class="d-flex align-items-center">
     <% if line_item.variant.product.weight > 0 %>

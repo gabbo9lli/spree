@@ -20,7 +20,7 @@ module Spree
             price = find_price(product_or_variant, currency)
             return nil if price.new_record?
 
-            Spree::Money.new(99, currency: currency).to_s
+            Spree::Money.new(price.amount, currency: currency).to_s
           end
 
           def compare_at_price(product_or_variant, currency)
