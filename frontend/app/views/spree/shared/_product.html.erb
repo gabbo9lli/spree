@@ -6,11 +6,6 @@
       <div class="product-component-name" title="<%= product.name %>">
         <%= product.name %>
       </div>
-      <% if spree_current_user %>
-        <div class="product-component-price"><%= display_price(product) %></div>
-      <% else %>
-        <div class="product-component-price">Per favore eseguire login per vedere il prezzo</div>
-      <% end %>
     </div>
   <% end %>
 <% end %>
