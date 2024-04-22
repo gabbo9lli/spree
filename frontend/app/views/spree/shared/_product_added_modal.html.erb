@@ -38,7 +38,11 @@
             </div>
             <div class="col-8 col-sm-6 col-lg-4 py-1 product-added-modal-product-details">
               <div class="product-added-modal-product-details-name"></div>
-              <div class="product-added-modal-product-details-price"></div>
+              <% if spree_current_user %>
+                <div class="product-added-modal-product-details-price"></div>
+              <% else %>
+                Effettuare login per poter aggiungere il prodotto al carrello
+              <% end %>
             </div>
           </div>
         </div>

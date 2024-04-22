@@ -25,7 +25,10 @@
 
 <% if view == "desktop" %>
   <div class="shopping-cart-item-total d-none d-lg-table-cell" data-hook="cart_item_total">
-    <%= line_item.display_amount.to_html unless line_item.quantity.nil? %>
+    <% if spree_current_user %>
+      <%= line_item.display_amount.to_html unless line_item.quantity.nil? %>
+    <% else %>
+    <% end %>
   </div>
 <% end %>
 
