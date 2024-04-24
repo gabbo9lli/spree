@@ -5,6 +5,9 @@
     <div>
       <div class="product-component-name" title="<%= product.name %>">
         <%= product.name %>
+        <% if spree_current_user %>
+        <div class="product-component-price"><%= display_price(product) %></div>
+        <% end %>
       </div>
       <% if spree_current_user %>
         <div class="product-component-price"><%= display_price(product) %></div>
