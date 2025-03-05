@@ -1,7 +1,7 @@
 require 'spec_helper'
 
 describe Spree::LineItem, type: :model do
-  let!(:store) { create(:store) }
+  let!(:store) { Spree::Store.default }
   let(:order) { create :order_with_line_items, line_items_count: 1, store: store }
   let(:line_item) { order.line_items.first }
 
@@ -22,6 +22,18 @@ describe Spree::LineItem, type: :model do
           it { expect(line_item).not_to be_valid }
         end
       end
+    end
+  end
+
+  describe '#quantity' do
+    it 'has a default quantity of 1' do
+      line_item = build(:line_item)
+      expect(line_item.quantity).to eq(1)
+    end
+
+    it 'allows to set different value for quantity' do
+      line_item = build(:line_item, quantity: 5)
+      expect(line_item.quantity).to eq(5)
     end
   end
 
@@ -159,6 +171,8 @@ describe Spree::LineItem, type: :model do
 
   # Test for #3391
   context '#copy_price' do
+    let(:variant) { line_item.variant }
+
     it "copies over a variant's prices" do
       line_item.price = nil
       line_item.cost_price = nil
@@ -168,6 +182,38 @@ describe Spree::LineItem, type: :model do
       expect(line_item.price).to eq(variant.price)
       expect(line_item.cost_price).to eq(variant.cost_price)
       expect(line_item.currency).to eq(variant.currency)
+    end
+
+    context "variant price amount is equal 0" do
+      before do
+        variant.prices.where(currency: order.currency).update_all(amount: 0.0)
+        line_item.price = nil
+        line_item.copy_price
+      end
+
+      it "copies over a variant's price" do
+        expect(line_item.price).to eq(0)
+      end
+
+      it "should be valid" do
+        expect(line_item).to be_valid
+      end
+    end
+
+    context 'no price available in the selected currency' do
+      before do
+        variant.prices.where(currency: order.currency).delete_all
+        line_item.price = nil
+        line_item.copy_price
+      end
+
+      it "doesn't copy the price" do
+        expect(line_item.price).to be_nil
+      end
+
+      it "shouldn't be valid" do
+        expect(line_item).not_to be_valid
+      end
     end
   end
 
@@ -392,6 +438,47 @@ describe Spree::LineItem, type: :model do
         expect do
           line_item.send(:update_price_from_modifier, nil, gift_wrap: true)
         end.to change { line_item.price.to_f }.to(11.99).from(10)
+      end
+    end
+  end
+
+  describe '#shipments' do
+    let(:line_item) { create(:line_item) }
+    let(:inventory_unit) { create(:inventory_unit, line_item: line_item) }
+    let!(:shipment) { create(:shipment, inventory_units: [inventory_unit]) }
+
+    it 'returns the shipments for the line item' do
+      expect(line_item.shipments).to eq([shipment])
+    end
+  end
+
+  describe '#shipping_cost' do
+    let(:line_item) { create(:line_item) }
+    let(:inventory_unit) { create(:inventory_unit, line_item: line_item) }
+    let(:shipment) { create(:shipment, inventory_units: [inventory_unit], cost: 10) }
+
+    it 'returns the shipping cost for the line item' do
+      shipment
+      expect(line_item.shipping_cost).to eq(10)
+    end
+
+    context 'when the shipment is canceled' do
+      it 'returns 0' do
+        shipment.cancel!
+        expect(line_item.shipping_cost).to eq(0)
+      end
+    end
+
+    context 'when the shipment is not present' do
+      it 'returns 0' do
+        expect(line_item.shipping_cost).to eq(0)
+      end
+    end
+
+    context 'when the shipment cost is 0' do
+      it 'returns 0' do
+        shipment.update(cost: 0)
+        expect(line_item.shipping_cost).to eq(0)
       end
     end
   end

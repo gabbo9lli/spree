@@ -42,14 +42,14 @@ module Spree
       :id, :firstname, :lastname, :first_name, :last_name,
       :address1, :address2, :city, :country_iso, :country_id, :state_id,
       :zipcode, :phone, :state_name, :alternative_phone, :company,
-      :user_id, :deleted_at, :label,
+      :user_id, :deleted_at, :label, :quick_checkout,
       { country: [:iso, :name, :iso3, :iso_name],
         state: [:name, :abbr] }
     ]
 
     @@checkout_attributes = [
-      :coupon_code, :email, :shipping_method_id, :special_instructions, :use_billing,
-      :user_id, :bill_address_id, :ship_address_id
+      :coupon_code, :email, :shipping_method_id, :special_instructions, :use_billing, :use_shipping,
+      :user_id, :bill_address_id, :ship_address_id, :accept_marketing, :signup_for_an_account
     ]
 
     @@classification_attributes = [
@@ -94,10 +94,14 @@ module Spree
       :option_values_hash, :weight, :height, :width, :depth,
       :shipping_category_id, :tax_category_id,
       :cost_currency, :cost_price, :compare_at_price,
-      { option_type_ids: [], taxon_ids: [] }
+      {
+        tag_list: [],
+        option_type_ids: [],
+        taxon_ids: []
+      }
     ]
 
-    @@property_attributes = [:name, :presentation]
+    @@property_attributes = [:name, :presentation, :position]
 
     @@return_authorization_attributes = [:amount, :memo, :stock_location_id, :inventory_units_attributes,
                                          :return_authorization_reason_id]
@@ -109,7 +113,7 @@ module Spree
 
     # month / year may be provided by some sources, or others may elect to use one field
     @@source_attributes = [
-      :number, :month, :year, :expiry, :verification_value,
+      :id, :number, :month, :year, :expiry, :verification_value,
       :first_name, :last_name, :cc_type, :gateway_customer_profile_id,
       :gateway_payment_profile_id, :last_digits, :name, :encrypted_data
     ]
@@ -128,14 +132,17 @@ module Spree
 
     @@store_attributes = [:name, :url, :seo_title, :code, :meta_keywords,
                           :meta_description, :default_currency, :mail_from_address,
-                          :customer_support_email, :facebook, :twitter, :instagram,
-                          :description, :address, :contact_phone, :supported_locales,
-                          :default_locale, :default_country_id, :supported_currencies,
+                          :customer_support_email, :description, :address, :contact_phone,
+                          :supported_locales, :default_locale, :default_country_id, :supported_currencies,
                           :new_order_notifications_email, :checkout_zone_id, :seo_robots,
-                          :digital_asset_authorized_clicks, :digital_asset_authorized_days,
-                          :limit_digital_download_count, :limit_digital_download_days, :digital_asset_link_expire_time,
-                          { mailer_logo_attributes: {}, favicon_image_attributes: {}, logo_attributes: {} },
-                          { data_feed_settings_attributes: [:enabled, :id] }]
+                          :preferred_timezone, :preferred_weight_unit, :preferred_unit_system,
+                          :preferred_digital_asset_authorized_clicks, :preferred_digital_asset_authorized_days,
+                          :preferred_limit_digital_download_count, :preferred_limit_digital_download_days,
+                          :preferred_digital_asset_link_expire_time,
+                          :logo, :mailer_logo, :social_logo, :favicon_image,
+                          :import_products_from_store_id, :import_payment_methods_from_store_id,
+                          :checkout_message, :customer_terms_of_service, :customer_privacy_policy,
+                          :customer_returns_policy, :customer_shipping_policy, :default_country_iso]
 
     @@store_credit_attributes = %i[amount currency category_id memo]
 
@@ -146,15 +153,16 @@ module Spree
       :taxonomy_id, :meta_description, :meta_keywords, :meta_title, :child_index
     ]
 
-    # TODO: Should probably use something like Spree.user_class.attributes
     @@user_attributes = [:email, :bill_address_id, :ship_address_id, :password, :first_name, :last_name,
-                         :password_confirmation, { public_metadata: {}, private_metadata: {} }, :selected_locale]
+                         :password_confirmation, :selected_locale, :avatar, :accepts_email_marketing, :phone,
+                         { public_metadata: {}, private_metadata: {}, tag_list: [] }]
 
     @@variant_attributes = [
       :name, :presentation, :cost_price, :discontinue_on, :lock_version,
       :position, :track_inventory,
       :product_id, :product, :option_values_attributes, :price, :compare_at_price,
       :weight, :height, :width, :depth, :sku, :barcode, :cost_currency,
+      :weight_unit, :dimensions_unit,
       { options: [:name, :value], option_value_ids: [] }
     ]
 

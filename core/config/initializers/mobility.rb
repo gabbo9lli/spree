@@ -1,3 +1,7 @@
+Rails.application.config.after_initialize do
+  require 'mobility/action_text'
+end
+
 Mobility.configure do |config|
   config.plugins do
     ransack
@@ -8,11 +12,10 @@ Mobility.configure do |config|
     backend_reader
     query
     cache
-    fallbacks
+    store_based_fallbacks
     locale_accessors
     presence
     dirty
+    column_fallback
   end
-
-  config.defaults[:fallbacks] = true
 end

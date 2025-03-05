@@ -17,7 +17,8 @@ if ENV['COVERAGE']
     add_filter '/lib/spree/testing_support/'
     add_filter '/lib/generators/'
 
-    coverage_dir "#{ENV['COVERAGE_DIR']}/core" if ENV['COVERAGE_DIR']
+    coverage_dir "#{ENV['COVERAGE_DIR']}/core_"+ ENV.fetch('CIRCLE_NODE_INDEX', 0) if ENV['COVERAGE_DIR']
+    command_name "test_" + ENV.fetch('CIRCLE_NODE_INDEX', 0)
   end
 end
 
@@ -41,11 +42,13 @@ require 'spree/testing_support/i18n' if ENV['CHECK_TRANSLATIONS']
 
 require 'spree/testing_support/factories'
 require 'spree/testing_support/jobs'
+require 'spree/testing_support/store'
 require 'spree/testing_support/metadata'
 require 'spree/testing_support/preferences'
 require 'spree/testing_support/url_helpers'
 require 'spree/testing_support/kernel'
 require 'spree/testing_support/rspec_retry_config'
+require 'spree/testing_support/next_instance_of'
 
 RSpec.configure do |config|
   config.color = true
@@ -59,14 +62,12 @@ RSpec.configure do |config|
   # If you're not using ActiveRecord, or you'd prefer not to run each of your
   # examples within a transaction, comment the following line or assign false
   # instead of true.
-  config.use_transactional_fixtures = false
+  config.use_transactional_fixtures = true
 
   config.before(:suite) do
     # Clean out the database state before the tests run
     DatabaseCleaner.strategy = :transaction
     DatabaseCleaner.clean_with(:truncation)
-    # Force jobs to be executed in a synchronous way
-    ActiveJob::Base.queue_adapter = :inline
   end
 
   config.around(:each) do |example|
@@ -79,9 +80,6 @@ RSpec.configure do |config|
     begin
       Rails.cache.clear
       reset_spree_preferences
-
-      country = create(:country, name: 'United States of America', iso_name: 'UNITED STATES', iso: 'US', iso3: 'USA', states_required: true)
-      create(:store, default: true, default_country: country, default_currency: 'USD')
     rescue Errno::ENOTEMPTY
     end
   end
@@ -89,11 +87,6 @@ RSpec.configure do |config|
   config.include FactoryBot::Syntax::Methods
   config.include Spree::TestingSupport::Preferences
   config.include Spree::TestingSupport::Kernel
-
-  config.before(:suite) do
-    # Clean out the database state before the tests run
-    DatabaseCleaner.clean_with(:truncation)
-  end
 
   config.order = :random
   Kernel.srand config.seed

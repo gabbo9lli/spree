@@ -9,7 +9,7 @@ describe 'Taxonomies API', swagger: true do
     filter_examples: [{ name: 'filter[name_eq]', example: 'Categories' }]
   }
 
-  let(:id) { create(:taxonomy, store: store).id }
+  let(:id) { store.taxonomies.first.id }
   let(:records_list) { create_list(:taxonomy, 2) }
   let(:valid_create_param_value) do
     {
@@ -19,7 +19,7 @@ describe 'Taxonomies API', swagger: true do
   end
   let(:valid_update_param_value) do
     {
-      name: 'Categories',
+      name: 'Updated Taxonomy',
       position: 1,
       public_metadata: { balanced: true }
     }

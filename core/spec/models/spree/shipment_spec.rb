@@ -6,7 +6,7 @@ describe Spree::Shipment, type: :model do
   let!(:order) { create(:order, number: 'S12345') }
   let(:shipping_method) { create(:shipping_method, name: 'UPS') }
   let(:shipment) do
-    create(:shipment, cost: 1, state: 'pending', stock_location: create(:stock_location)).tap do |shipment|
+    create(:shipment, number: 'H21265865494', cost: 1, state: 'pending', stock_location: create(:stock_location)).tap do |shipment|
       allow(shipment).to receive_messages order: order
       allow(shipment).to receive_messages shipping_method: shipping_method
     end
@@ -28,6 +28,47 @@ describe Spree::Shipment, type: :model do
       # prevent it from updating pre_tax_amount
       allow_any_instance_of(Spree::LineItem).to receive(:update_tax_charge)
       expect(line_item.reload.pre_tax_amount).to eq(4.2051)
+    end
+  end
+
+  describe '#name' do
+    it 'returns the shipment number and shipping method name' do
+      expect(shipment.name).to eq('H21265865494 UPS')
+    end
+  end
+
+  describe '#tracked?' do
+    it 'returns true if the shipment is tracked' do
+      expect(shipment.tracked?).to eq(true)
+    end
+
+    context 'when the shipment is not tracked' do
+      let(:shipment) { build(:shipment, number: nil, tracking: nil) }
+
+      it 'returns false' do
+        expect(shipment.tracked?).to eq(false)
+      end
+    end
+  end
+
+  describe '#partial?' do
+    subject { shipment.partial? }
+
+    let(:shipment) { create(:shipment, order: order) }
+
+    let!(:line_item) { create(:line_item, quantity: 5, order: order) }
+    let(:order) { create(:order) }
+
+    context 'when all products are included in the shipment' do
+      it { is_expected.to be(false) }
+    end
+
+    context 'when not all products are included in the shipment' do
+      before do
+        shipment.inventory_units.first.update!(quantity: 3)
+      end
+
+      it { is_expected.to be(true) }
     end
   end
 
@@ -56,6 +97,11 @@ describe Spree::Shipment, type: :model do
 
     it 'returns canceled if order is canceled?' do
       allow(order).to receive_messages canceled?: true
+      expect(shipment.determine_state(order)).to eq 'canceled'
+    end
+
+    it 'returns canceled when shipment is canceled' do
+      allow(shipment).to receive_messages canceled?: true
       expect(shipment.determine_state(order)).to eq 'canceled'
     end
 
@@ -172,7 +218,7 @@ describe Spree::Shipment, type: :model do
   context '#free?' do
     let!(:order) { create(:order) }
     let!(:shipment) { create(:shipment, cost: 10, order: order) }
-    let(:free_shipping_promotion) { create(:free_shipping_promotion, code: 'freeship') }
+    let(:free_shipping_promotion) { create(:free_shipping_promotion, code: 'freeship', kind: :coupon_code) }
 
     it 'returns true if final_price is equal to 0' do
       shipment.adjustment_total = -10
@@ -187,8 +233,25 @@ describe Spree::Shipment, type: :model do
     end
   end
 
+  describe '#with_free_shipping_promotion?' do
+    let!(:order) { create(:order) }
+    let!(:shipment) { create(:shipment, cost: 10, order: order) }
+    let(:free_shipping_promotion) { create(:free_shipping_promotion, code: 'freeship', kind: :coupon_code) }
+
+    it 'returns true when Free Shipping promotion is applied' do
+      order.coupon_code = free_shipping_promotion.code
+      Spree::PromotionHandler::Coupon.new(order).apply
+      expect(order.promotions).to include(free_shipping_promotion)
+      expect(shipment.with_free_shipping_promotion?).to eq(true)
+    end
+
+    it 'returns false otherwise' do
+      expect(shipment.with_free_shipping_promotion?).to eq(false)
+    end
+  end
+
   context '#store' do
-    let(:store) { create(:store) }
+    let(:store) { Spree::Store.default }
     let!(:order) { create(:order, store: store) }
     let!(:shipment) { create(:shipment, cost: 10, order: order) }
 
@@ -743,10 +806,11 @@ describe Spree::Shipment, type: :model do
   context '#transfer_to_location' do
     # Order with 2 line items in order to be able to split one shipment into 2
     let(:order) { create(:completed_order_with_totals, line_items_count: 2) }
-    let(:stock_location) { create(:stock_location, propagate_all_variants: true, backorderable_default: true) }
+    let!(:stock_location) { create(:stock_location, propagate_all_variants: true, backorderable_default: true) }
     let(:variant) { order.line_items.first.variant }
 
     before do
+      perform_enqueued_jobs(except: Spree::Addresses::GeocodeAddressJob)
       shipping_method = order.shipments.first.shipping_method
       shipping_method.calculator.preferences[:amount] = order.shipments.first.cost
       shipping_method.calculator.save!
@@ -824,6 +888,20 @@ describe Spree::Shipment, type: :model do
       state_change = shipment.state_changes.first
       expect(state_change.previous_state).to eq('pending')
       expect(state_change.next_state).to eq('ready')
+    end
+  end
+
+  describe '.ready_or_pending' do
+    subject { described_class.ready_or_pending }
+
+    let!(:ready_shipments) { create_list(:shipment, 2, state: 'ready') }
+    let!(:pending_shipments) { create_list(:shipment, 2, state: 'pending') }
+    let!(:shipped_shipments) { create_list(:shipment, 2, state: 'shipped') }
+
+    it 'returns shipments with state ready or pending' do
+      expect(subject.pluck(:state).uniq).to contain_exactly('ready', 'pending')
+      expect(subject).to include(*ready_shipments, *pending_shipments)
+      expect(subject).not_to include(*shipped_shipments)
     end
   end
 end

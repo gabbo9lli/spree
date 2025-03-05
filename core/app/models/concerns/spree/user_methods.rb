@@ -6,7 +6,7 @@ module Spree
     include Spree::UserReporting
     include Spree::UserRoles
     include Spree::RansackableAttributes
-
+    include Spree::MultiSearchable
     included do
       # we need to have this callback before any dependent: :destroy associations
       # https://github.com/rails/rails/issues/3458
@@ -16,19 +16,55 @@ module Spree
 
       attr_accessor :use_billing
 
+      has_person_name
+      auto_strip_attributes :email, :first_name, :last_name
+      acts_as_taggable_on :tags
+
+      #
+      # Associations
+      #
       has_many :promotion_rule_users, class_name: 'Spree::PromotionRuleUser', foreign_key: :user_id, dependent: :destroy
       has_many :promotion_rules, through: :promotion_rule_users, class_name: 'Spree::PromotionRule'
-
       has_many :orders, foreign_key: :user_id, class_name: 'Spree::Order'
-      has_many :store_credits, foreign_key: :user_id, class_name: 'Spree::StoreCredit'
-
+      has_many :completed_orders, -> { complete }, foreign_key: :user_id, class_name: 'Spree::Order'
+      has_many :store_credits, class_name: 'Spree::StoreCredit', foreign_key: :user_id, dependent: :destroy
+      has_many :wishlists, class_name: 'Spree::Wishlist', foreign_key: :user_id, dependent: :destroy
+      has_many :wished_items, through: :wishlists, source: :wished_items
       belongs_to :ship_address, class_name: 'Spree::Address', optional: true
       belongs_to :bill_address, class_name: 'Spree::Address', optional: true
 
-      has_many :wishlists, class_name: 'Spree::Wishlist', foreign_key: :user_id
+      #
+      # Attachments
+      #
+      has_one_attached :avatar, service: Spree.public_storage_service_name
 
-      self.whitelisted_ransackable_associations = %w[bill_address ship_address addresses]
-      self.whitelisted_ransackable_attributes = %w[id email]
+      #
+      # Attributes
+      #
+      attr_accessor :confirm_email, :terms_of_service
+
+      def self.multi_search(query)
+        sanitized_query = sanitize_query_for_multi_search(query)
+        return none if query.blank?
+
+        name_conditions = []
+
+        name_conditions << multi_search_condition(self, :first_name, sanitized_query)
+        name_conditions << multi_search_condition(self, :last_name, sanitized_query)
+
+        full_name = NameOfPerson::PersonName.full(sanitized_query)
+
+        if full_name.first.present? && full_name.last.present?
+          name_conditions << multi_search_condition(self, :first_name, full_name.first)
+          name_conditions << multi_search_condition(self, :last_name, full_name.last)
+        end
+
+        where(email: sanitized_query).or(where(name_conditions.reduce(:or)))
+      end
+
+      self.whitelisted_ransackable_associations = %w[bill_address ship_address addresses tags]
+      self.whitelisted_ransackable_attributes = %w[id email first_name last_name accepts_email_marketing]
+      self.whitelisted_ransackable_scopes = %w[multi_search]
 
       def self.with_email(query)
         where("#{table_name}.email LIKE ?", "%#{query}%")
@@ -48,7 +84,7 @@ module Spree
     end
 
     def last_incomplete_spree_order(store, options = {})
-      orders.where(store: store).incomplete.
+      orders.where(store: store).incomplete.not_canceled.
         includes(options[:includes]).
         order('created_at DESC').
         first
@@ -75,6 +111,10 @@ module Spree
       end
     end
 
+    def can_be_deleted?
+      orders.complete.none?
+    end
+
     private
 
     def check_completed_orders
@@ -82,6 +122,8 @@ module Spree
     end
 
     def nullify_approver_id_in_approved_orders
+      return unless Spree.admin_user_class != Spree.user_class
+
       Spree::Order.where(approver_id: id).update_all(approver_id: nil)
     end
 
@@ -96,6 +138,14 @@ module Spree
 
     def use_billing?
       use_billing.in?([true, 'true', '1'])
+    end
+
+    def scramble_email_and_names
+      self.email = "#{SecureRandom.uuid}@example.net"
+      self.first_name = 'Deleted'
+      self.last_name = 'User'
+      self.login = email
+      save
     end
   end
 end

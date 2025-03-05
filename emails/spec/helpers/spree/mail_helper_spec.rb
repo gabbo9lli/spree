@@ -52,7 +52,7 @@ module Spree
     describe '#logo_path' do
       subject { helper.logo_path }
 
-      let(:store) { create(:store) }
+      let(:store) { Spree::Store.default }
 
       before do
         allow(helper).to receive(:current_store) { store }
@@ -62,13 +62,13 @@ module Spree
         let(:logo_image) { File.open(File.expand_path('../../../app/assets/images/logo/spree_50.png', __dir__)) }
 
         before do
-          store.build_mailer_logo
-          store.mailer_logo.attachment.attach(io: logo_image, filename: 'spree_50.png', content_type: 'image/png')
+          store.mailer_logo.attach(io: logo_image, filename: 'spree_50.png', content_type: 'image/png')
+          store.save!
           @order = create(:order, store: store)
         end
 
         it 'shows logo attached to orders store' do
-          expect(subject).to include(store.mailer_logo.attachment.filename.to_s)
+          expect(subject).to include(store.mailer_logo.filename.to_s)
         end
       end
 
@@ -76,12 +76,12 @@ module Spree
         let(:logo_image) { File.open(File.expand_path('../../../app/assets/images/noimage/mini.png', __dir__)) }
 
         before do
-          store.build_mailer_logo
-          store.mailer_logo.attachment.attach(io: logo_image, filename: 'mini.png', content_type: 'image/png')
+          store.mailer_logo.attach(io: logo_image, filename: 'mini.png', content_type: 'image/png')
+          store.save!
         end
 
         it 'shows logo attached to current store' do
-          expect(subject).to include(store.mailer_logo.attachment.filename.to_s)
+          expect(subject).to include(store.mailer_logo.filename.to_s)
         end
       end
     end

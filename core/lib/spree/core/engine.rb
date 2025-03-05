@@ -11,7 +11,18 @@ module Spree
                                :adjusters,
                                :stock_splitters,
                                :promotions,
-                               :line_item_comparison_hooks)
+                               :line_item_comparison_hooks,
+                               :data_feed_types,
+                               :export_types,
+                               :taxon_rules,
+                               :themes,
+                               :theme_layout_sections,
+                               :pages,
+                               :page_sections,
+                               :page_blocks,
+                               :reports,
+                               :analytics_events,
+                               :analytics_event_handlers)
       SpreeCalculators = Struct.new(:shipping_methods, :tax_rates, :promotion_actions_create_adjustments, :promotion_actions_create_item_adjustments)
       PromoEnvironment = Struct.new(:rules, :actions)
       isolate_namespace Spree
@@ -23,9 +34,13 @@ module Spree
 
       initializer 'spree.environment', before: :load_config_initializers do |app|
         app.config.spree = Environment.new(SpreeCalculators.new, Spree::Core::Configuration.new, Spree::Core::Dependencies.new)
-        app.config.active_record.yaml_column_permitted_classes = [Symbol, BigDecimal]
+
+        app.config.active_record.yaml_column_permitted_classes ||= []
+        app.config.active_record.yaml_column_permitted_classes.concat([Symbol, BigDecimal, ActiveSupport::HashWithIndifferentAccess])
         Spree::Config = app.config.spree.preferences
+        Spree::RuntimeConfig = app.config.spree.preferences # for compatibility
         Spree::Dependencies = app.config.spree.dependencies
+        Spree::Deprecation = ActiveSupport::Deprecation.new
       end
 
       initializer 'spree.register.calculators', before: :after_initialize do |app|
@@ -122,6 +137,135 @@ module Spree
           Promotion::Actions::CreateLineItems,
           Promotion::Actions::FreeShipping
         ]
+
+        Rails.application.config.spree.data_feed_types = [
+          Spree::DataFeed::Google
+        ]
+
+        Rails.application.config.spree.export_types = [
+          Spree::Exports::Products,
+          Spree::Exports::Orders
+        ]
+
+        Rails.application.config.spree.taxon_rules = [
+          Spree::TaxonRules::Tag,
+          Spree::TaxonRules::AvailableOn,
+          Spree::TaxonRules::Sale,
+        ]
+
+        Rails.application.config.spree.themes = [
+          Spree::Themes::Default
+        ]
+
+        Rails.application.config.spree.theme_layout_sections = [
+          Spree::PageSections::AnnouncementBar,
+          Spree::PageSections::Header,
+          Spree::PageSections::Newsletter,
+          Spree::PageSections::Footer
+        ]
+
+        Rails.application.config.spree.pages = [
+          Spree::Pages::Cart,
+          Spree::Pages::Post,
+          Spree::Pages::TaxonList,
+          Spree::Pages::Custom,
+          Spree::Pages::ProductDetails,
+          Spree::Pages::ShopAll,
+          Spree::Pages::Taxon,
+          Spree::Pages::Wishlist,
+          Spree::Pages::SearchResults,
+          Spree::Pages::Checkout,
+          Spree::Pages::Password,
+          Spree::Pages::Homepage,
+          Spree::Pages::Login,
+          Spree::Pages::PostList,
+          Spree::Pages::Account
+        ]
+
+        Rails.application.config.spree.page_sections = [
+          Spree::PageSections::FeaturedPosts,
+          Spree::PageSections::TaxonGrid,
+          Spree::PageSections::ImageWithText,
+          Spree::PageSections::FeaturedTaxon,
+          Spree::PageSections::CollectionBanner,
+          Spree::PageSections::ProductDetails,
+          Spree::PageSections::MainPasswordFooter,
+          Spree::PageSections::RelatedProducts,
+          Spree::PageSections::CustomCode,
+          Spree::PageSections::TaxonBanner,
+          Spree::PageSections::FeaturedProduct,
+          Spree::PageSections::ProductGrid,
+          Spree::PageSections::ImageBanner,
+          Spree::PageSections::PageTitle,
+          Spree::PageSections::MainPasswordHeader,
+          Spree::PageSections::PostDetails,
+          Spree::PageSections::PostGrid,
+          Spree::PageSections::FeaturedTaxons,
+          Spree::PageSections::RichText,
+          Spree::PageSections::Video,
+          Spree::PageSections::Footer,
+          Spree::PageSections::Newsletter,
+          Spree::PageSections::Header,
+          Spree::PageSections::AnnouncementBar
+        ]
+
+        Rails.application.config.spree.page_blocks = [
+          Spree::PageBlocks::Link,
+          Spree::PageBlocks::MegaNav,
+          Spree::PageBlocks::MegaNavWithSubcategories,
+          Spree::PageBlocks::Subheading,
+          Spree::PageBlocks::Heading,
+          Spree::PageBlocks::Nav,
+          Spree::PageBlocks::Buttons,
+          Spree::PageBlocks::Text,
+          Spree::PageBlocks::NewsletterForm,
+          Spree::PageBlocks::Image,
+          Spree::PageBlocks::Products::Title,
+          Spree::PageBlocks::Products::Share,
+          Spree::PageBlocks::Products::Price,
+          Spree::PageBlocks::Products::QuantitySelector,
+          Spree::PageBlocks::Products::VariantPicker,
+          Spree::PageBlocks::Products::BuyButtons
+        ]
+
+        Rails.application.config.spree.reports = [
+          Spree::Reports::ProductsPerformance,
+          Spree::Reports::SalesTotal
+        ]
+
+        Rails.application.config.spree.analytics_events = {
+          product_viewed: 'Product Viewed',
+          product_list_viewed: 'Product List Viewed',
+          product_searched: 'Product Searched',
+          product_added: 'Product Added',
+          product_removed: 'Product Removed',
+
+          product_added_to_wishlist: 'Product Added to Wishlist',
+          product_removed_from_wishlist: 'Product Removed from Wishlist',
+
+          subscribed_to_newsletter: 'Subscribed to Newsletter',
+          unsubscribed_from_newsletter: 'Unsubscribed from Newsletter',
+
+          payment_info_entered: 'Payment Info Entered',
+          coupon_entered: 'Coupon Entered',
+          coupon_removed: 'Coupon Removed',
+          coupon_applied: 'Coupon Applied',
+          coupon_denied: 'Coupon Denied',
+
+          checkout_started: 'Checkout Started',
+          checkout_email_entered: 'Checkout Email Entered',
+          checkout_step_viewed: 'Checkout Step Viewed',
+          checkout_step_completed: 'Checkout Step Completed',
+
+          order_completed: 'Order Completed',
+          order_cancelled: 'Order Cancelled',
+          order_refunded: 'Order Refunded',
+          package_shipped: 'Package Shipped',
+          order_fulfilled: 'Order Fulfilled',
+
+          gift_card_issued: 'Gift Card Issued'
+        }
+        Rails.application.config.spree.analytics_event_handlers = []
       end
 
       initializer 'spree.promo.register.promotions.actions' do |app|
@@ -142,6 +286,22 @@ module Spree
 
       initializer 'spree.core.checking_migrations' do
         Migrations.new(config, engine_name).check
+      end
+
+      initializer 'spree.core.assets' do |app|
+        if app.config.respond_to?(:assets)
+          app.config.assets.paths << root.join('app/javascript')
+          app.config.assets.paths << root.join('vendor/javascript')
+          app.config.assets.precompile += %w[spree_core_manifest]
+        end
+      end
+
+      initializer 'spree.core.importmap', before: 'importmap' do |app|
+        if app.config.respond_to?(:importmap)
+          app.config.importmap.paths << root.join('config/importmap.rb')
+          # https://github.com/rails/importmap-rails?tab=readme-ov-file#sweeping-the-cache-in-development-and-test
+          app.config.importmap.cache_sweepers << root.join('app/javascript')
+        end
       end
 
       config.to_prepare do

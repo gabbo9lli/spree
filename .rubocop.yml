@@ -1,7 +1,7 @@
 require: rubocop-rspec
 
 AllCops:
-  TargetRubyVersion: 2.5
+  TargetRubyVersion: 3.0
   Exclude:
     - '**/sandbox/**/*'
     - '**/db/migrate/*'
@@ -51,9 +51,10 @@ Metrics/BlockLength:
     - '**/*.rake'
     - '**/factories/**/*'
     - '**/config/routes.rb'
+    - '**/lib/**/testing_support/**/*'
 
 Metrics/AbcSize:
- Max: 45
+  Max: 45
 
 Style/StringLiterals:
   EnforcedStyle: single_quotes
@@ -140,6 +141,9 @@ Style/HashTransformKeys:
   Enabled: false
 
 Style/HashTransformValues:
+  Enabled: false
+
+Style/Alias:
   Enabled: false
 
 RSpec/NestedGroups:

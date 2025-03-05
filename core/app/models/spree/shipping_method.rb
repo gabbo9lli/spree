@@ -1,16 +1,17 @@
 module Spree
-  class ShippingMethod < Spree::Base
+  class ShippingMethod < Spree.base_class
     acts_as_paranoid
     include Spree::CalculatedAdjustments
-    include Metadata
-    if defined?(Spree::Webhooks)
+    include Spree::Metadata
+    include Spree::DisplayOn
+    if defined?(Spree::Webhooks::HasWebhooks)
       include Spree::Webhooks::HasWebhooks
     end
     if defined?(Spree::VendorConcern)
       include Spree::VendorConcern
     end
 
-    DISPLAY = [:both, :front_end, :back_end]
+    extend Spree::DisplayMoney
 
     # Used for #refresh_rates
     DISPLAY_ON_FRONT_END = 1
@@ -30,8 +31,17 @@ module Spree
     belongs_to :tax_category, -> { with_deleted }, class_name: 'Spree::TaxCategory', optional: true
 
     validates :name, :display_on, presence: true
-
+    validates :estimated_transit_business_days_min, numericality: { greater_than_or_equal_to: 1 }, allow_nil: true
+    validates :estimated_transit_business_days_max, numericality: { greater_than_or_equal_to: 1 }, allow_nil: true
     validate :at_least_one_shipping_category
+
+    if defined?(PgSearch)
+      # full text search
+      include PgSearch::Model
+      pg_search_scope :search_by_name, against: %i[name]
+    else
+      scope :search_by_name, ->(query) { where('name LIKE ?', "%#{query}%") }
+    end
 
     def include?(address)
       return false unless address
@@ -42,9 +52,25 @@ module Spree
     end
 
     def build_tracking_url(tracking)
-      return if tracking.blank? || tracking_url.blank?
+      return if tracking.blank?
 
-      tracking_url.gsub(/:tracking/, ERB::Util.url_encode(tracking)) # :url_encode exists in 1.8.7 through 2.1.0
+      tracking = tracking.upcase
+
+      # build tracking url automatically
+      if tracking_url.blank?
+        # use tracking number gem to build tracking url
+        # we need to upcase the tracking number
+        # https://github.com/jkeen/tracking_number/pull/85
+        tracking_number_service(tracking).tracking_url if tracking_number_service(tracking).valid?
+      else
+        # build tracking url manually
+        tracking_url.gsub(/:tracking/, ERB::Util.url_encode(tracking)) # :url_encode exists in 1.8.7 through 2.1.0
+      end
+    end
+
+    # your shipping method subclasses can override this method to provide a custom tracking number service
+    def tracking_number_service(tracking)
+      @tracking_number_service ||= Spree::Dependencies.tracking_number_service.constantize.new(tracking)
     end
 
     def self.calculators
@@ -55,6 +81,38 @@ module Spree
     def available_to_display?(display_filter)
       (frontend? && display_filter == DISPLAY_ON_FRONT_END) ||
         (backend? && display_filter == DISPLAY_ON_BACK_END)
+    end
+
+    def delivery_range
+      return unless estimated_transit_business_days_min || estimated_transit_business_days_max
+
+      if estimated_transit_business_days_min == estimated_transit_business_days_max
+        estimated_transit_business_days_min.to_s
+      else
+        "#{estimated_transit_business_days_min}-#{estimated_transit_business_days_max}"
+      end
+    end
+
+    def display_estimated_price
+      return unless calculator
+
+      @display_estimated_price ||= begin
+        calculator.description + ': ' +
+
+        if calculator.is_a?(Spree::Calculator::Shipping::FlatRate)
+          if calculator.preferred_amount == 0
+            Spree.t(:free)
+          else
+            Spree::Money.new(calculator.preferred_amount, { currency: calculator.preferred_currency }).to_s
+          end
+        elsif calculator.is_a?(Spree::Calculator::Shipping::FlexiRate)
+          Spree::Money.new(calculator.preferred_first_item, { currency: calculator.preferred_currency }).to_s
+        elsif calculator.is_a?(Spree::Calculator::Shipping::FlatPercentItemTotal)
+          ActionController::Base.helpers.number_to_percentage(calculator.preferred_flat_percent, precision: 2)
+        else
+          ''
+        end
+      end
     end
 
     private

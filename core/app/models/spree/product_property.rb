@@ -1,14 +1,21 @@
 module Spree
-  class ProductProperty < Spree::Base
+  class ProductProperty < Spree.base_class
     include Spree::FilterParam
-    include TranslatableResource
+    include Spree::TranslatableResource
 
-    TRANSLATABLE_FIELDS = %i[value filter_param].freeze
-    translates(*TRANSLATABLE_FIELDS)
+    if Spree.always_use_translations?
+      TRANSLATABLE_FIELDS = %i[value filter_param].freeze
+      translates(*TRANSLATABLE_FIELDS)
+    else
+      TRANSLATABLE_FIELDS = %i[value].freeze
+      translates(*TRANSLATABLE_FIELDS, column_fallback: true)
+    end
 
     self::Translation.class_eval do
       auto_strip_attributes :value
     end
+
+    auto_strip_attributes :value
 
     acts_as_list scope: :product
 
@@ -25,6 +32,9 @@ module Spree
 
     scope :filterable, -> { joins(:property).where(Property.table_name => { filterable: true }) }
     scope :for_products, ->(products) { joins(:product).merge(products) }
+    scope :sort_by_property_position, -> {
+      joins(:property).order("spree_properties.position ASC")
+    }
 
     self.whitelisted_ransackable_attributes = ['value', 'filter_param']
     self.whitelisted_ransackable_associations = ['property']
@@ -33,7 +43,7 @@ module Spree
     delegate :name, :presentation, to: :property, prefix: true, allow_nil: true
 
     def property_name=(name)
-      ActiveSupport::Deprecation.warn(<<-DEPRECATION, caller)
+      Spree::Deprecation.warn(<<-DEPRECATION, caller)
         `ProductProperty#property_name=` is deprecated and will be removed in Spree 5.0.
       DEPRECATION
       if name.present?

@@ -1,6 +1,6 @@
 module Spree
-  class InventoryUnit < Spree::Base
-    if defined?(Spree::Webhooks)
+  class InventoryUnit < Spree.base_class
+    if defined?(Spree::Webhooks::HasWebhooks)
       include Spree::Webhooks::HasWebhooks
     end
 

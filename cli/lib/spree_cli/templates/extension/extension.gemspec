@@ -7,17 +7,16 @@ require '<%= file_name %>/version'
 Gem::Specification.new do |s|
   s.platform    = Gem::Platform::RUBY
   s.name        = '<%= file_name %>'
-  s.version     = <%= class_name %>.version
-  s.summary     = 'Add extension summary here'
-  s.description = 'Add (optional) extension description here'
-  s.required_ruby_version = '>= 2.5'
+  s.version     = <%= class_name %>::VERSION
+  s.summary     = "Spree Commerce <%= human_name %> Extension"
+  s.required_ruby_version = '>= 3.0'
 
   s.author    = 'You'
   s.email     = 'you@example.com'
   s.homepage  = 'https://github.com/your-github-handle/<%= file_name %>'
-  s.license = 'BSD-3-Clause'
+  s.license = 'AGPL-3.0-or-later'
 
-  s.files       = `git ls-files`.split("\n").reject { |f| f.match(/^spec/) && !f.match(/^spec\/fixtures/) }
+  s.files       = Dir["{app,config,db,lib}/**/*", "LICENSE.md", "Rakefile", "README.md"].reject { |f| f.match(/^spec/) && !f.match(/^spec\/fixtures/) }
   s.require_path = 'lib'
   s.requirements << 'none'
 

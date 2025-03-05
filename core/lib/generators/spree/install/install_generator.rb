@@ -19,6 +19,7 @@ module Spree
     class_option :admin_password, type: :string
     class_option :lib_name, type: :string, default: 'spree'
     class_option :enforce_available_locales, type: :boolean, default: nil
+    class_option :authentication, type: :string, default: 'devise'
 
     def self.source_paths
       paths = superclass.source_paths
@@ -35,6 +36,7 @@ module Spree
       @install_storefront = options[:install_storefront]
       @install_admin = options[:install_admin]
       @copy_storefront = options[:copy_storefront]
+      @authentication = options[:authentication]
 
       unless @run_migrations
         @load_seed_data = false
@@ -64,25 +66,30 @@ module Spree
       ROBOTS
     end
 
-    def create_overrides_directory
-      empty_directory 'app/overrides'
+    # Currently we only support devise, in the future we will also add support for default Rails authentication
+    def install_authentication
+      if @authentication == 'devise'
+        generate 'spree:authentication:devise'
+      elsif @authentication == 'dummy'
+        # this is for dummy / test app
+      end
     end
 
     def install_storefront
       if @install_storefront && Spree::Core::Engine.frontend_available?
-        generate 'spree:frontend:install'
+        generate 'spree:storefront:install'
       end
     end
 
     def install_admin
-      if @install_admin && Spree::Core::Engine.backend_available?
-        generate 'spree:backend:install'
+      if @install_admin && Spree::Core::Engine.admin_available?
+        generate 'spree:admin:install'
       end
     end
 
     def copy_storefront
       if @copy_storefront && Spree::Core::Engine.frontend_available?
-        generate 'spree:frontend:copy_storefront'
+        generate 'spree:storefront:copy_storefront'
       end
     end
 
@@ -92,11 +99,6 @@ module Spree
         config.to_prepare do
           # Load application's model / class decorators
           Dir.glob(File.join(File.dirname(__FILE__), "../app/**/*_decorator*.rb")) do |c|
-            Rails.configuration.cache_classes ? require(c) : load(c)
-          end
-
-          # Load application's view overrides
-          Dir.glob(File.join(File.dirname(__FILE__), "../app/overrides/*.rb")) do |c|
             Rails.configuration.cache_classes ? require(c) : load(c)
           end
         end
@@ -122,26 +124,14 @@ module Spree
       say_status :copying, 'migrations'
       silence_stream(STDOUT) do
         silence_warnings { rake 'railties:install:migrations' }
-      end
-    end
-
-    def create_database
-      say_status :creating, 'database'
-      silence_stream(STDOUT) do
-        silence_stream(STDERR) do
-          silence_warnings { rake 'db:create' }
-        end
+        silence_warnings { rake 'acts_as_taggable_on_engine:install:migrations' }
       end
     end
 
     def run_migrations
       if @run_migrations
         say_status :running, 'migrations'
-        silence_stream(STDOUT) do
-          silence_stream(STDERR) do
-            silence_warnings { rake 'db:migrate' }
-          end
-        end
+        rake 'db:migrate'
       else
         say_status :skipping, "migrations (don't forget to run rake db:migrate)"
       end
@@ -157,11 +147,7 @@ module Spree
 
         cmd = -> { rake("db:seed #{rake_options.join(' ')}") }
         if options[:auto_accept] || (options[:admin_email] && options[:admin_password])
-          silence_stream(STDOUT) do
-            silence_stream(STDERR) do
-              silence_warnings &cmd
-            end
-          end
+          silence_warnings &cmd
         else
           cmd.call
         end
@@ -175,11 +161,7 @@ module Spree
 
       if @load_sample_data
         say_status :loading, 'sample data'
-        silence_stream(STDOUT) do
-          silence_stream(STDERR) do
-            silence_warnings { rake 'spree_sample:load' }
-          end
-        end
+        rake 'spree_sample:load'
       else
         say_status :skipping, 'sample data (you can always run rake spree_sample:load)'
       end

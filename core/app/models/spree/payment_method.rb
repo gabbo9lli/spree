@@ -1,22 +1,22 @@
 module Spree
-  class PaymentMethod < Spree::Base
+  class PaymentMethod < Spree.base_class
     acts_as_paranoid
     acts_as_list
 
-    include MultiStoreResource
+    include Spree::MultiStoreResource
     include Spree::Metadata
+    include Spree::DisplayOn
     if defined?(Spree::Security::PaymentMethods)
       include Spree::Security::PaymentMethods
     end
 
-    DISPLAY = [:both, :front_end, :back_end].freeze
+    scope :active,    -> { where(active: true).order(position: :asc) }
+    scope :available, -> { active.where(display_on: [:front_end, :back_end, :both]) }
 
-    scope :active,                 -> { where(active: true).order(position: :asc) }
-    scope :available,              -> { active.where(display_on: [:front_end, :back_end, :both]) }
-    scope :available_on_front_end, -> { active.where(display_on: [:front_end, :both]) }
-    scope :available_on_back_end,  -> { active.where(display_on: [:back_end, :both]) }
+    after_initialize :set_name, if: :new_record?
 
     validates :name, presence: true
+    auto_strip_attributes :name
 
     has_many :store_payment_methods, class_name: 'Spree::StorePaymentMethod'
     has_many :stores, class_name: 'Spree::Store', through: :store_payment_methods
@@ -47,6 +47,14 @@ module Spree
       type.demodulize.downcase
     end
 
+    def default_name
+      self.class.name.demodulize.titleize.gsub(/Gateway/, '').strip
+    end
+
+    def payment_icon_name
+      type.demodulize.gsub(/(^Spree::Gateway::|Gateway$)/, '').downcase.gsub(/\s+/, '').strip
+    end
+
     def self.find_with_destroyed(*args)
       unscoped { find(*args) }
     end
@@ -56,6 +64,10 @@ module Spree
     end
 
     def source_required?
+      true
+    end
+
+    def show_in_admin?
       true
     end
 
@@ -103,6 +115,10 @@ module Spree
 
     def public_preference_keys
       []
+    end
+
+    def set_name
+      self.name ||= default_name
     end
   end
 end

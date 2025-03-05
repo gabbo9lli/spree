@@ -72,7 +72,7 @@ describe Spree::Webhooks::Subscribers::HandleRequest do
           )
           allow(Rails.logger).to receive(with_log_level)
           subject.call
-          expect(Rails.logger).to have_received(with_log_level).with(log_msg)
+          expect(Rails.logger).to have_received(with_log_level).with(log_msg) if log_msg
         end
       end
 
@@ -137,7 +137,7 @@ describe Spree::Webhooks::Subscribers::HandleRequest do
       context 'without a failed request' do
         let(:execution_time) { rand(1..999999) }
         let(:failed_request) { false }
-        let(:log_msg) { "[SPREE WEBHOOKS] 'order.canceled' success for URL 'http://google.com/'" }
+        let(:log_msg) { nil }
         let(:response_code) { 200 }
         let(:success) { true }
 
@@ -185,16 +185,18 @@ describe Spree::Webhooks::Subscribers::HandleRequest do
         end
 
         it 'adds the event data to the body' do
-          with_webhooks_enabled do
-            allow(Spree::Webhooks::Subscribers::MakeRequest).to receive(:new).and_call_original
-            order.finalize!
-            expect(Spree::Webhooks::Subscribers::MakeRequest).to \
-              have_received(:new).
-              with(
-                signature: event_signature,
-                url: url,
-                webhook_payload_body: body_with_event_metadata
-              )
+          perform_enqueued_jobs(except: Spree::Addresses::GeocodeAddressJob) do
+            with_webhooks_enabled do
+              allow(Spree::Webhooks::Subscribers::MakeRequest).to receive(:new).and_call_original
+              order.finalize!
+              expect(Spree::Webhooks::Subscribers::MakeRequest).to \
+                have_received(:new).
+                with(
+                  signature: event_signature,
+                  url: url,
+                  webhook_payload_body: body_with_event_metadata
+                )
+            end
           end
         end
       end

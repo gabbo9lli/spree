@@ -2,9 +2,9 @@ require 'spec_helper'
 require 'spree/testing_support/order_walkthrough'
 
 describe Spree::Order, type: :model do
-  let!(:store) { create(:store, default: true) }
+  let!(:store) { Spree::Store.default }
   let(:order) { build(:order, store: store) }
-  let(:country) { create(:country) }
+  let(:country) { store.default_country }
   let!(:state) { country.states.first || create(:state, country: country) }
 
   def assert_state_changed(order, from, to)
@@ -235,14 +235,11 @@ describe Spree::Order, type: :model do
 
       context 'cannot transition to delivery' do
         context 'with an existing shipment' do
-          before do
-            line_item = FactoryBot.create(:line_item, price: 10)
-            order.line_items << line_item
-          end
+          let!(:line_item) { create(:line_item, price: 10, order: order) }
 
           context 'if there are no shipping rates for any shipment' do
             it 'raises an InvalidTransitionError' do
-              expect { order.next! }.to raise_error(StateMachines::InvalidTransition, /#{Spree.t(:items_cannot_be_shipped)}/)
+              expect { order.next! }.to raise_error(StateMachines::InvalidTransition, /#{Spree.t(:products_cannot_be_shipped, product_names: line_item.name)}/)
             end
 
             it 'deletes all the shipments' do
@@ -379,9 +376,10 @@ describe Spree::Order, type: :model do
       context 'without confirmation required' do
         before do
           order.email = 'spree@example.com'
+          order.total = 100
           allow(order).to receive_messages confirmation_required?: false
           allow(order).to receive_messages payment_required?: true
-          order.payments << FactoryBot.create(:payment, state: payment_state, order: order)
+          order.payments << FactoryBot.create(:payment, amount: 100, state: payment_state, order: order)
         end
 
         context 'when there is at least one valid payment' do
@@ -483,6 +481,36 @@ describe Spree::Order, type: :model do
         order.temporary_credit_card = true
         order.next!
         expect(order.user.reload.default_credit_card).to be_nil
+      end
+
+      context 'when user is not present' do
+        before do
+          order.user = nil
+          order.email = 'new@customer.com'
+          order.save!
+        end
+
+        context 'with signup_for_an_account set to true' do
+          before do
+            allow(order).to receive(:signup_for_an_account?).and_return(true)
+          end
+
+          it 'creates a new user' do
+            expect { order.next! }.to change { Spree.user_class.count }.by(1)
+            expect(order.user).to be_present
+            expect(order.user.email).to eq(order.email)
+          end
+        end
+
+        context 'with signup_for_an_account set to false' do
+          before do
+            allow(order).to receive(:signup_for_an_account?).and_return(false)
+          end
+
+          it 'does not create a new user' do
+            expect { order.next! }.not_to change { Spree.user_class.count }
+          end
+        end
       end
     end
   end

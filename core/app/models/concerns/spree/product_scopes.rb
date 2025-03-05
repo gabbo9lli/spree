@@ -33,15 +33,15 @@ module Spree
 
       def self.property_conditions(property)
         properties_table = Property.table_name
-        property_translations_table = Property.translation_table_alias
+
         case property
         when Property then { "#{properties_table}.id" => property.id }
         when Integer  then { "#{properties_table}.id" => property }
         else
           if Property.column_for_attribute('id').type == :uuid
-            ["#{property_translations_table.name} = ? OR #{properties_table.id} = ?", property, property]
+            ["#{properties_table}.name = ? OR #{properties_table}.id = ?", property, property]
           else
-            { "#{property_translations_table}.name" => property }
+            { "#{properties_table}.name" => property }
           end
         end
       end
@@ -127,25 +127,29 @@ module Spree
 
       # a scope that finds all products having property specified by name, object or id
       add_search_scope :with_property do |property|
-        joins(:properties).join_translation_table(Property).where(property_conditions(property))
+        joins(:properties).where(property_conditions(property))
       end
 
       # a simple test for product with a certain property-value pairing
       # note that it can test for properties with NULL values, but not for absent values
       add_search_scope :with_property_value do |property, value|
-        joins(:properties).
-          join_translation_table(Property).
-          join_translation_table(ProductProperty).
-          where("#{ProductProperty.translation_table_alias}.value = ?", value).
-          where(property_conditions(property))
+        if Spree.use_translations?
+          joins(:properties).
+            join_translation_table(Property).
+            join_translation_table(ProductProperty).
+            where("#{ProductProperty.translation_table_alias}.value = ?", value).
+            where(property_conditions(property))
+        else
+          joins(:properties).
+            where("#{ProductProperty.table_name}.value = ?", value).
+            where(property_conditions(property))
+        end
       end
 
       add_search_scope :with_property_values do |property_filter_param, property_values|
         joins(product_properties: :property).
-          join_translation_table(Property).
-          join_translation_table(ProductProperty).
-          where(Property.translation_table_alias => { filter_param: property_filter_param }).
-          where(ProductProperty.translation_table_alias => { filter_param: property_values.map(&:parameterize) })
+          where(Property.table_name => { filter_param: property_filter_param }).
+          where(ProductProperty.table_name => { filter_param: property_values.map(&:parameterize) })
       end
 
       add_search_scope :with_option do |option|
@@ -156,9 +160,7 @@ module Spree
         elsif OptionType.column_for_attribute('id').type == :uuid
           joins(:option_types).where(spree_option_types: { name: option }).or(Product.joins(:option_types).where(spree_option_types: { id: option }))
         else
-          joins(:option_types).
-            join_translation_table(OptionType).
-            where(OptionType.translation_table_alias => { name: option })
+          joins(:option_types).where(OptionType.table_name => { name: option })
         end
       end
 
@@ -179,9 +181,7 @@ module Spree
 
         group("#{Spree::Product.table_name}.id").
           joins(variants_including_master: :option_values).
-          join_translation_table(Spree::OptionValue).
-          where(Spree::OptionValue.translation_table_alias => { name: value },
-                Spree::OptionValue.table_name => { option_type_id: option_type_id })
+          where(Spree::OptionValue.table_name => { name: value, option_type_id: option_type_id })
       end
 
       # Finds all products which have either:
@@ -246,7 +246,7 @@ module Spree
 
       def self.not_discontinued(only_not_discontinued = true)
         if only_not_discontinued != '0' && only_not_discontinued
-          where.not(status: 'archived')
+          where(discontinue_on: [nil, Time.current..])
         else
           all
         end
@@ -263,11 +263,11 @@ module Spree
 
       # Can't use add_search_scope for this as it needs a default argument
       def self.available(available_on = nil, currency = nil)
-        if available_on
-          scope = not_discontinued.where("#{Product.quoted_table_name}.available_on <= ?", available_on)
-        else
-          scope = where(status: 'active')
-        end
+        scope = if available_on
+                  not_discontinued.where("#{Product.quoted_table_name}.available_on <= ?", available_on)
+                else
+                  not_discontinued.where(status: 'active')
+                end
 
         unless Spree::Config.show_products_without_price
           currency ||= Spree::Store.default.default_currency
@@ -305,7 +305,7 @@ module Spree
       # .search_by_name
       if defined?(PgSearch)
         include PgSearch::Model
-        pg_search_scope :search_by_name, against: :name, using: { tsearch: { any_word: true, prefix: true } }
+        pg_search_scope :search_by_name, against: { name: 'A', meta_title: 'B' }, using: { tsearch: { any_word: true, prefix: true } }
       else
         def self.search_by_name(query)
           i18n { name.lower.matches("%#{query.downcase}%") }

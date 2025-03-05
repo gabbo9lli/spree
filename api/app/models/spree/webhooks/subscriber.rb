@@ -5,7 +5,12 @@ module Spree
         include Spree::VendorConcern
       end
 
-      has_secure_token :secret_key
+      if Rails::VERSION::STRING >= '7.1.0'
+        has_secure_token :secret_key, on: :save
+      else
+        has_secure_token :secret_key
+      end
+
 
       has_many :events, inverse_of: :subscriber
 
@@ -20,6 +25,10 @@ module Spree
 
       before_save :parse_subscriptions
 
+      def latest_event_at
+        events.order(:created_at).last&.created_at
+      end
+      
       def self.with_urls_for(event)
         where(
           case ActiveRecord::Base.connection.adapter_name
@@ -27,6 +36,8 @@ module Spree
             ["('*' MEMBER OF(subscriptions) OR ? MEMBER OF(subscriptions))", event]
           when 'PostgreSQL'
             ["subscriptions @> '[\"*\"]' OR subscriptions @> ?", [event].to_json]
+          when 'SQLite'
+            ["subscriptions LIKE '%\"*\"%' OR subscriptions LIKE ?", "%#{event}%"]
           end
         )
       end

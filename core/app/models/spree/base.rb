@@ -1,6 +1,10 @@
 class Spree::Base < ApplicationRecord
   include Spree::Preferences::Preferable
-  serialize :preferences, Hash
+  if Rails::VERSION::STRING >= '7.1.0'
+    serialize :preferences, type: Hash, coder: YAML
+  else
+    serialize :preferences, Hash
+  end
 
   include Spree::RansackableAttributes
   include Spree::TranslatableResourceScopes
@@ -18,6 +22,10 @@ class Spree::Base < ApplicationRecord
   end
 
   self.abstract_class = true
+
+  scope :for_ordering_with_translations, lambda { |klass, fields = nil|
+    select("#{klass.table_name}.*").select(*(fields || klass::TRANSLATABLE_FIELDS))
+  }
 
   def self.belongs_to_required_by_default
     false
@@ -46,8 +54,13 @@ class Spree::Base < ApplicationRecord
     false
   end
 
+  # this can overridden in subclasses to disallow deletion
+  def can_be_deleted?
+    true
+  end
+
   def self.json_api_columns
-    column_names.reject { |c| c.match(/_id$|id|preferences|(.*)password|(.*)token|(.*)api_key/) }
+    column_names.reject { |c| c.match(/_id$|id|preferences|(.*)password|(.*)token|(.*)api_key|^original_(.*)/) }
   end
 
   def self.json_api_permitted_attributes
@@ -62,5 +75,33 @@ class Spree::Base < ApplicationRecord
 
   def self.json_api_type
     to_s.demodulize.underscore
+  end
+
+  def self.to_tom_select_json
+    pluck(:name, :id).map do |name, id|
+      {
+        id: id,
+        name: name
+      }
+    end.as_json
+  end
+
+  def uuid_for_friendly_id
+    SecureRandom.uuid
+  end
+
+  # Try building a slug based on the following fields in increasing order of specificity.
+  def slug_candidates
+    if defined?(:deleted_at) && deleted_at.present?
+      [
+        ['deleted', :name],
+        ['deleted', :name, :uuid_for_friendly_id]
+      ]
+    else
+      [
+        [:name],
+        [:name, :uuid_for_friendly_id]
+      ]
+    end
   end
 end

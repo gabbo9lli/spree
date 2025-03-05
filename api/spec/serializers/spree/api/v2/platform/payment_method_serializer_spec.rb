@@ -29,8 +29,7 @@ describe Spree::Api::V2::Platform::PaymentMethodSerializer do
             updated_at: resource.updated_at,
             preferences: {
               dummy_key: 'PUBLICKEY123',
-              server: 'test',
-              test_mode: true
+              dummy_secret_key: 'SECRETKEY123'
             },
             public_metadata: {},
             private_metadata: {}

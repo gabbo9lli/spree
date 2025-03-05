@@ -1,8 +1,8 @@
 module Spree
-  class CreditCard < Spree::Base
+  class CreditCard < Spree.base_class
     include ActiveMerchant::Billing::CreditCardMethods
-    include Metadata
-    if defined?(Spree::Webhooks)
+    include Spree::Metadata
+    if defined?(Spree::Webhooks::HasWebhooks)
       include Spree::Webhooks::HasWebhooks
     end
     if defined?(Spree::Security::CreditCards)
@@ -99,12 +99,14 @@ module Spree
     def cc_type=(type)
       self[:cc_type] = case type
                        when 'mastercard', 'maestro' then 'master'
-                       when 'amex' then 'american_express'
+                      when 'amex' then 'american_express'
                        when 'dinersclub' then 'diners_club'
                        when '' then try_type_from_number
                        else type
                        end
     end
+
+    alias_method :brand=, :cc_type=
 
     def verification_value=(value)
       @verification_value = value.to_s.gsub(/\s/, '')

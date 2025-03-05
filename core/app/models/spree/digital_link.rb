@@ -1,8 +1,12 @@
 module Spree
-  class DigitalLink < Spree::Base
-    has_secure_token
+  class DigitalLink < Spree.base_class
+    if Rails::VERSION::STRING >= '7.1.0'
+      has_secure_token on: :save
+    else
+      has_secure_token
+    end
 
-    if defined?(Spree::Webhooks)
+    if defined?(Spree::Webhooks::HasWebhooks)
       include Spree::Webhooks::HasWebhooks
     end
     if defined?(Spree::Security::DigitalLinks)
@@ -21,16 +25,16 @@ module Spree
     end
 
     def expired?
-      if line_item.order.store.limit_digital_download_days
-        created_at <= line_item.order.store.digital_asset_authorized_days.day.ago
+      if line_item.order.store.preferred_limit_digital_download_days
+        created_at <= line_item.order.store.preferred_digital_asset_authorized_days.day.ago
       else
         false
       end
     end
 
     def access_limit_exceeded?
-      if line_item.order.store.limit_digital_download_count
-        access_counter >= line_item.order.store.digital_asset_authorized_clicks
+      if line_item.order.store.preferred_limit_digital_download_count
+        access_counter >= line_item.order.store.preferred_digital_asset_authorized_clicks
       else
         false
       end
